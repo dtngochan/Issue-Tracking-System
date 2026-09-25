@@ -63,6 +63,9 @@ def create_project():
     if not key or not name:
         return jsonify({'error': 'Ma du an (Key) va Ten du an la bat buoc'}), 400
         
+    if not pm_id:
+        return jsonify({'error': 'Vui lòng gán PM phụ trách để khởi tạo dự án'}), 400
+        
     if Project.query.filter_by(project_key=key).first():
         return jsonify({'error': f'Ma du an "{key}" da ton tai'}), 400
         
@@ -188,6 +191,14 @@ def add_module(project_id):
 
     if not name:
         return jsonify({'error': 'Ten Module khong duoc de trong'}), 400
+
+    existing_mod = Module.query.filter(
+        Module.project_id == project_id,
+        Module.module_name.ilike(name)
+    ).first()
+    
+    if existing_mod:
+        return jsonify({'error': f'Module với tên "{name}" đã tồn tại trong dự án này'}), 400
 
     new_mod = Module(
         project_id=project_id,
