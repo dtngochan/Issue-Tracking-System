@@ -59,12 +59,17 @@ def create_project():
     start_date = data.get('start_date')
     end_date = data.get('expected_end_date')
     pm_id = data.get('pm_id')
+    dev_id = data.get('dev_id')
+    qa_id = data.get('qa_id')
     
     if not key or not name:
         return jsonify({'error': 'Ma du an (Key) va Ten du an la bat buoc'}), 400
         
-    if not pm_id:
-        return jsonify({'error': 'Vui lòng gán PM phụ trách để khởi tạo dự án'}), 400
+    if not pm_id or not dev_id or not qa_id:
+        return jsonify({'error': 'Vui lòng gán đầy đủ PM, DEV và QA phụ trách để khởi tạo dự án'}), 400
+        
+    if len(set([pm_id, dev_id, qa_id])) < 3:
+        return jsonify({'error': 'Một người không thể kiêm nhiệm 2 hoặc 3 vai trò (PM, DEV, QA) trong cùng một dự án'}), 400
         
     if Project.query.filter_by(project_key=key).first():
         return jsonify({'error': f'Ma du an "{key}" da ton tai'}), 400
@@ -92,14 +97,19 @@ def create_project():
     db.session.add(new_project)
     db.session.flush()
     
-    # Gán PM nếu có chọn
-    if pm_id:
-        pm_member = ProjectMember(
+    # Gán PM, DEV, QA
+    roles_to_add = [
+        (pm_id, 'PM'),
+        (dev_id, 'DEV'),
+        (qa_id, 'QA')
+    ]
+    for uid, role in roles_to_add:
+        member = ProjectMember(
             project_id=new_project.project_id,
-            user_id=pm_id,
-            project_role='PM'
+            user_id=uid,
+            project_role=role
         )
-        db.session.add(pm_member)
+        db.session.add(member)
         
     db.session.commit()
     return jsonify(new_project.to_dict()), 201

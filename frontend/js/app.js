@@ -42,6 +42,17 @@ createApp({
     // Data Collections
     const allUsers = ref([]);
     const projects = ref([]);
+    const allowedProjectsForCreate = computed(() => {
+      if (!currentUser.value) return [];
+      if (currentUser.value.role === 'ADMIN') {
+        return projects.value.filter(p => p.status !== 'ARCHIVED');
+      }
+      return projects.value.filter(p => 
+        p.status !== 'ARCHIVED' && 
+        p.members && 
+        p.members.some(m => m.user_id === currentUser.value.user_id)
+      );
+    });
     const issues = ref([]);
     const dashboardData = ref(null);
     const activeIssue = ref(null);
@@ -69,9 +80,19 @@ createApp({
       assignee_id: ''
     });
 
+    const fileInput = ref(null);
+    const selectedFile = ref(null);
+
+    function handleFileUpload(e) {
+      if (e.target.files && e.target.files.length > 0) {
+        selectedFile.value = e.target.files[0];
+      }
+    }
+
 
     const currentProjectModules = ref([]);
     const currentProjectMembers = ref([]);
+    const triageProjectMembers = ref([]);
     const triageResult = reactive({
       confidence_score: 0,
       suggested_severity: 'MAJOR',
@@ -83,7 +104,7 @@ createApp({
     let triageTimer = null;
 
     // Project Create Form Modal
-    const newProject = reactive({ project_key: '', project_name: '', description: '', pm_id: '' });
+    const newProject = reactive({ project_key: '', project_name: '', description: '', pm_id: '', dev_id: '', qa_id: '' });
     const newMember = reactive({ project_id: null, user_id: '', project_role: 'DEV' });
     const newModule = reactive({ project_id: null, module_name: '', description: '', default_assignee_id: '' });
     const newUser = reactive({ full_name: '', email: '', global_role: 'USER' });
@@ -343,10 +364,17 @@ createApp({
 
     async function handleCreateProject() {
       if (!newProject.project_key || !newProject.project_name) return;
-      if (!newProject.pm_id) {
-        showToast('Vui lòng gán PM phụ trách trước khi tạo dự án!', 'warning');
+      if (!newProject.pm_id || !newProject.dev_id || !newProject.qa_id) {
+        showToast('Vui lòng gán đầy đủ PM, DEV và QA phụ trách trước khi tạo dự án!', 'warning');
         return;
       }
+      
+      const roleSet = new Set([newProject.pm_id, newProject.dev_id, newProject.qa_id]);
+      if (roleSet.size < 3) {
+        showToast('Lỗi: Một người không thể kiêm nhiệm 2 hoặc 3 vai trò (PM, DEV, QA) trong cùng một dự án!', 'danger');
+        return;
+      }
+
       try {
         const res = await fetch(`${API}/projects`, {
           method: 'POST',
@@ -360,6 +388,8 @@ createApp({
           newProject.project_name = '';
           newProject.description = '';
           newProject.pm_id = '';
+          newProject.dev_id = '';
+          newProject.qa_id = '';
           closeBootstrapModal('createProjectModal');
           loadProjects();
         } else {
@@ -537,6 +567,18 @@ createApp({
     function triggerTriage() {
       clearTimeout(triageTimer);
       triageTimer = setTimeout(async () => {
+        // Auto assign DEV based on module immediately
+        if (createForm.module_id) {
+          const mod = currentProjectModules.value.find(m => m.module_id === createForm.module_id);
+          if (mod && mod.default_assignee_id) {
+            createForm.assignee_id = mod.default_assignee_id;
+          } else {
+            createForm.assignee_id = '';
+          }
+        } else {
+          createForm.assignee_id = '';
+        }
+
         if (!createForm.title && !createForm.raw_logs) {
           triageResult.confidence_score = 0;
           triageResult.reasons = ['Nhập tiêu đề hoặc dán console log để hệ thống phân tích tự động...'];
@@ -564,7 +606,7 @@ createApp({
           createForm.severity = d.suggested_severity;
           createForm.issue_type = d.suggested_type;
           createForm.priority = d.suggested_priority;
-          if (d.suggested_assignee_id) {
+          if (d.suggested_assignee_id && !createForm.assignee_id) {
             createForm.assignee_id = d.suggested_assignee_id;
           }
         } catch (e) {
@@ -599,14 +641,21 @@ DatabaseConnectionError: Pool exhausted (max 20 reached).`;
         return;
       }
       try {
-        const payload = {
-          ...createForm,
-          reporter_id: currentUser.value ? currentUser.value.user_id : 1
-        };
+        const formData = new FormData();
+        Object.keys(createForm).forEach(key => {
+          if (createForm[key] !== null && createForm[key] !== '') {
+            formData.append(key, createForm[key]);
+          }
+        });
+        formData.append('reporter_id', currentUser.value ? currentUser.value.user_id : 1);
+
+        if (selectedFile.value) {
+          formData.append('file', selectedFile.value);
+        }
+
         const res = await fetch(`${API}/issues`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: formData
         });
         const data = await res.json();
         if (res.ok) {
@@ -617,6 +666,10 @@ DatabaseConnectionError: Pool exhausted (max 20 reached).`;
           createForm.steps_to_reproduce = '';
           createForm.raw_logs = '';
           triageResult.confidence_score = 0;
+          selectedFile.value = null;
+          if (fileInput.value) {
+            fileInput.value.value = '';
+          }
           setTab('issues');
         } else {
           showToast(data.error || 'Lỗi khi tạo ticket', 'danger');
@@ -635,6 +688,19 @@ DatabaseConnectionError: Pool exhausted (max 20 reached).`;
         triageEdit.priority = activeIssue.value.priority || 'MEDIUM';
         triageEdit.severity = activeIssue.value.severity || 'MAJOR';
         commentInput.value = '';
+
+        try {
+          const pRes = await fetch(`${API}/projects/${activeIssue.value.project_id}`);
+          if (pRes.ok) {
+            const p = await pRes.json();
+            triageProjectMembers.value = p.members || [];
+          } else {
+            triageProjectMembers.value = [];
+          }
+        } catch (e) {
+          triageProjectMembers.value = [];
+        }
+
         openBootstrapModal('issueDetailModal');
       } catch (e) {
         showToast('Lỗi tải chi tiết ticket', 'danger');
@@ -770,8 +836,9 @@ DatabaseConnectionError: Pool exhausted (max 20 reached).`;
       openAddModuleModal, handleCreateModule, handleDeleteModule, newModule,
       issues, loadIssues, filterProject, filterStatus, filterSeverity, searchQuery,
       kanbanColumns, getIssuesByStatus,
-      createForm, currentProjectModules, currentProjectMembers, triageResult, triggerTriage,
-      onProjectChangeInCreate, fillSampleLog, handleCreateIssue,
+      createForm, currentProjectModules, currentProjectMembers, triageProjectMembers, triageResult, triggerTriage,
+      allowedProjectsForCreate,
+      onProjectChangeInCreate, fillSampleLog, handleCreateIssue, handleFileUpload, fileInput,
       activeIssue, openIssue, triageEdit, handleSaveTriage, handleChangeStatus,
       commentInput, handlePostComment,
       getSeverityBadge, getStatusBadge, formatDate
