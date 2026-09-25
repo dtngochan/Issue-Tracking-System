@@ -6,10 +6,17 @@
       <div class="form-group"><label>Du an *</label><select id="cProjSelect" class="form-control" required onchange="onCreateProjectChange()"></select></div>
       <div class="form-group"><label>Module *</label><select id="cModSelect" class="form-control" required onchange="triggerTriage()"></select></div>
     </div>
-    <div class="form-group"><label>Tieu de loi *</label><input type="text" id="cTitle" class="form-control" required placeholder="VD: Loi HTTP 500 khi thanh toan..." oninput="triggerTriage()"></div>
+    <div class="form-group">
+      <label>Tieu de loi *</label>
+      <input type="text" id="cTitle" class="form-control" required placeholder="VD: Loi HTTP 500 khi thanh toan...">
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
       <div class="form-group"><label>Mo ta chi tiet</label><textarea id="cDesc" class="form-control" placeholder="Mo ta loi..."></textarea></div>
       <div class="form-group"><label>Cac buoc tai hien (Steps to reproduce)</label><textarea id="cSteps" class="form-control" placeholder="1. Mo trang...\n2. Bam nut..."></textarea></div>
+    </div>
+    <div class="form-group">
+      <label>Dinh kem Anh / Video</label>
+      <input type="file" id="cAttachment" accept="image/*,video/*" multiple class="form-control">
     </div>
     <div class="form-group"><label>Console Log / Stacktrace (Auto-Triage phân tích tại đây) *</label>
       <textarea id="cLogs" class="form-control" style="min-height:100px;font-family:monospace;font-size:0.82rem;" placeholder="Dan doan log loi..." oninput="triggerTriage()"></textarea>
