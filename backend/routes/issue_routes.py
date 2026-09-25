@@ -34,8 +34,23 @@ def get_issues():
         user = User.query.get(user_id)
         if user and user.global_role != 'ADMIN':
             from models import ProjectMember
-            member_projects = db.session.query(ProjectMember.project_id).filter_by(user_id=user_id).subquery()
-            query = query.filter(Issue.project_id.in_(member_projects))
+            from sqlalchemy import or_, and_
+            
+            memberships = ProjectMember.query.filter_by(user_id=user_id).all()
+            dev_pids = [m.project_id for m in memberships if m.project_role == 'DEV']
+            other_pids = [m.project_id for m in memberships if m.project_role in ('PM', 'QA')]
+            
+            conditions = []
+            if other_pids:
+                conditions.append(Issue.project_id.in_(other_pids))
+            if dev_pids:
+                conditions.append(and_(Issue.project_id.in_(dev_pids), Issue.assignee_id == user_id))
+                
+            if conditions:
+                query = query.filter(or_(*conditions))
+            else:
+                # User has no projects, sees nothing
+                query = query.filter(Issue.issue_id == -1)
 
     if project_id:
         query = query.filter_by(project_id=project_id)
