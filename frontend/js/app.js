@@ -1,49 +1,87 @@
-const API = '/api';
-let currentUser = null;
-let projects = [], issues = [], activeIssue = null;
-let sevChart = null, statChart = null;
+/* ============================================================
+   ISSUE TRACKING & AUTO-TRIAGE SYSTEM (ITS)
+   Vue 3 + Bootstrap 5.3 Core Controller
+   ============================================================ */
 
-const roleMap = { 1: 'ADMIN', 2: 'PM', 3: 'DEV', 4: 'DEV', 5: 'QA', 6: 'QA' };
+const { createApp, ref, reactive, computed, onMounted, watch, nextTick } = Vue;
 
-document.addEventListener('DOMContentLoaded', () => { 
-  checkLogin(); 
-});
+createApp({
+  setup() {
+    // ----------------- STATE -----------------
+    const API = '/api';
+    const theme = ref(localStorage.getItem('its_theme') || 'dark');
+    const isLoggedIn = ref(false);
+    const currentUser = ref(null);
+    const activeTab = ref('dashboard');
+    const viewMode = ref('table'); // 'table' or 'kanban'
+    const loading = ref(false);
 
-function checkLogin() {
-  const savedUser = localStorage.getItem('its_user');
-  if (savedUser) {
-    currentUser = JSON.parse(savedUser);
-    showAppScreen();
-  } else {
-    showLoginScreen();
-  }
-}
-
-async function handleLogin(e) {
-  e.preventDefault();
-  const email = document.getElementById('loginEmail').value;
-  try {
-    const r = await fetch(`${API}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-    const d = await r.json();
-    if (r.ok) {
-      const u = d.user;
-      u.role = u.global_role === 'ADMIN' ? 'ADMIN' : (roleMap[u.user_id] || 'DEV');
-      localStorage.setItem('its_user', JSON.stringify(u));
-      currentUser = u;
-      showAppScreen();
-    } else {
-      alert(d.error);
+    // Toast state
+    const toast = reactive({ show: false, message: '', type: 'info', timer: null });
+    function showToast(message, type = 'info') {
+      toast.message = message;
+      toast.type = type;
+      toast.show = true;
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(() => { toast.show = false; }, 3500);
     }
-  } catch (err) {
-    console.error(err);
-    alert('Lỗi kết nối máy chủ!');
-  }
-}
 
+    // Role mapping for test users
+    const roleMap = { 1: 'ADMIN', 2: 'PM', 3: 'DEV', 4: 'DEV', 5: 'QA', 6: 'QA' };
+
+    // Login Form State
+    const loginEmail = ref('admin@company.com');
+    const demoAccounts = [
+      { role: 'ADMIN', email: 'admin@company.com', name: 'Nguyễn Văn Admin', icon: 'bi-shield-lock' },
+      { role: 'PM', email: 'pm@company.com', name: 'Trần Thị PM', icon: 'bi-kanban' },
+      { role: 'QA Lead', email: 'qa.lead@company.com', name: 'Hoàng Văn QA', icon: 'bi-bug' },
+      { role: 'Dev Backend', email: 'dev.backend@company.com', name: 'Lê Văn Backend', icon: 'bi-code-slash' },
+      { role: 'Dev Frontend', email: 'dev.frontend@company.com', name: 'Phạm Thị Frontend', icon: 'bi-laptop' }
+    ];
+
+    // Data Collections
+    const allUsers = ref([]);
+    const projects = ref([]);
+    const issues = ref([]);
+    const dashboardData = ref(null);
+    const activeIssue = ref(null);
+    const activeProjectDetail = ref(null);
+
+    // Filters for Issues
+    const filterProject = ref('');
+    const filterStatus = ref('');
+    const filterSeverity = ref('');
+    const searchQuery = ref('');
+    const myIssuesOnly = ref(false);
+
+    // Auto-Triage / Create Issue Form
+    const createForm = reactive({
+      project_id: '',
+      module_id: '',
+      title: '',
+      description: '',
+      steps_to_reproduce: '',
+      raw_logs: '',
+      environment: 'DEV',
+      severity: 'MAJOR',
+      issue_type: 'BUG',
+      priority: 'MEDIUM',
+      assignee_id: ''
+    });
+
+<<<<<<< HEAD
+    const currentProjectModules = ref([]);
+    const currentProjectMembers = ref([]);
+    const triageResult = reactive({
+      confidence_score: 0,
+      suggested_severity: 'MAJOR',
+      suggested_type: 'BUG',
+      suggested_priority: 'MEDIUM',
+      suggested_assignee_id: null,
+      reasons: []
+    });
+    let triageTimer = null;
+=======
 function handleLogout() {
   localStorage.removeItem('its_user');
   currentUser = null;
@@ -207,60 +245,40 @@ async function loadProjects() {
     users.forEach(u => pmSel.innerHTML += `<option value="${u.user_id}">${u.full_name} (${u.email})</option>`);
   } catch (e) { console.error(e); }
 }
+>>>>>>> bbd2b81b6cb46ac570f6e547ca8e262dcd95eaa8
 
-function renderProjectsGrid() {
-  const g = document.getElementById('projectsGrid');
-  g.innerHTML = '';
-  projects.forEach(p => {
-    const a = p.status === 'ARCHIVED';
-    g.innerHTML += `
-      <div class="glass-card" style="margin-bottom:0;">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span class="badge ${a?'badge-trivial':'badge-status'}">${p.project_key}</span>
-          <span class="badge ${a?'badge-critical':'badge-closed'}">${p.status}</span>
-        </div>
-        <h3 style="margin-top:8px;font-size:1rem;">${p.project_name}</h3>
-        <p style="color:var(--text-muted);font-size:0.8rem;margin:6px 0;">${p.description||''}</p>
-        <div style="font-size:0.75rem;color:#cbd5e1;margin-bottom:8px;">${p.members_count} Thanh vien | ${p.modules_count} Modules</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn btn-secondary btn-sm" onclick="viewProjectDetail(${p.project_id})">Chi tiet</button>
-          <button class="btn btn-secondary btn-sm" onclick="showAddMemberModal(${p.project_id})">+ Thanh vien</button>
-          <button class="btn btn-secondary btn-sm" onclick="showAddModuleModal(${p.project_id})">+ Module</button>
-          <button class="btn ${a?'btn-success':'btn-danger'} btn-sm" style="flex:1;" onclick="archiveProject(${p.project_id},'${a?'ACTIVE':'ARCHIVED'}')">
-            ${a?'Mo lai (Unarchive)':'Luu tru (Archive)'}
-          </button>
-        </div>
-      </div>`;
-  });
-}
+    // Project Create Form Modal
+    const newProject = reactive({ project_key: '', project_name: '', description: '', pm_id: '' });
+    const newMember = reactive({ project_id: null, user_id: '', project_role: 'DEV' });
+    const newModule = reactive({ project_id: null, module_name: '', description: '', default_assignee_id: '' });
+    const newUser = reactive({ full_name: '', email: '', global_role: 'USER' });
 
-async function viewProjectDetail(pid) {
-  const r = await fetch(`${API}/projects/${pid}`);
-  const p = await r.json();
-  document.getElementById('pdTitle').textContent = `${p.project_key} - ${p.project_name} [${p.status}]`;
-  const mDiv = document.getElementById('pdMembers');
-  mDiv.innerHTML = p.members.map(m => `<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);">${m.user?.full_name || 'N/A'} - <span class="badge badge-status">${m.project_role}</span>
-    <button class="btn btn-danger btn-sm" style="float:right;padding:2px 6px;font-size:0.7rem;" onclick="removeMember(${pid},${m.user_id})">Xoa</button></div>`).join('') || 'Chua co thanh vien';
-  const moDiv = document.getElementById('pdModules');
-  moDiv.innerHTML = p.modules.map(m => `<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);">${m.module_name} <span style="color:var(--text-muted);font-size:0.75rem;">(Dev: ${m.default_assignee?.full_name || 'Chua gan'})</span>
-    <button class="btn btn-danger btn-sm" style="float:right;padding:2px 6px;font-size:0.7rem;" onclick="deleteModule(${pid},${m.module_id})">Xoa</button></div>`).join('') || 'Chua co module';
-  showModal('projectDetailModal');
-}
+    // Issue Modal State
+    const commentInput = ref('');
+    const triageEdit = reactive({ assignee_id: '', priority: 'MEDIUM', severity: 'MAJOR' });
 
-async function archiveProject(pid, status) {
-  if (currentUser.role !== 'PM' && currentUser.role !== 'ADMIN') { alert('Chi PM hoac Admin moi co quyen!'); return; }
-  const r = await fetch(`${API}/projects/${pid}/archive`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({status}) });
-  const d = await r.json();
-  alert(d.message || d.error);
-  loadProjects();
-}
+    // Charts references
+    let sevChart = null;
+    let statChart = null;
 
-async function createProject(e) {
-  e.preventDefault();
-  const r = await fetch(`${API}/projects`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ project_key: document.getElementById('npKey').value, project_name: document.getElementById('npName').value, description: document.getElementById('npDesc').value, pm_id: document.getElementById('npPM').value || null }) });
-  if (r.ok) { alert('Tao du an thanh cong!'); closeModal('createProjectModal'); loadProjects(); } else { const d = await r.json(); alert(d.error); }
-}
+    // ----------------- LIFECYCLE -----------------
+    onMounted(async () => {
+      applyTheme(theme.value);
+      checkSession();
+      if (isLoggedIn.value) {
+        await initAppData();
+      }
+    });
 
+<<<<<<< HEAD
+    function toggleTheme() {
+      theme.value = theme.value === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('its_theme', theme.value);
+      applyTheme(theme.value);
+      if (activeTab.value === 'dashboard') {
+        nextTick(renderCharts);
+      }
+=======
 async function showAddMemberModal(pid) {
   document.getElementById('amProjId').value = pid;
   const users = await (await fetch(`${API}/auth/users`)).json();
@@ -358,191 +376,663 @@ async function prepareCreateForm() {
     const cp = document.getElementById('cProjSelect');
     if(cp) {
       cp.innerHTML = '<option value="">-- Chon Du an --</option>' + myProjects.map(p => `<option value="${p.project_id}">${p.project_key} - ${p.project_name} ${p.status==='ARCHIVED'?'[Read-Only]':''}</option>`).join('');
+>>>>>>> bbd2b81b6cb46ac570f6e547ca8e262dcd95eaa8
     }
-  } catch(e) { console.error(e); }
-  onCreateProjectChange();
-}
 
-async function onCreateProjectChange() {
-  const pid = document.getElementById('cProjSelect').value;
-  if (!pid) return;
-  const r = await fetch(`${API}/projects/${pid}`);
-  const p = await r.json();
-  document.getElementById('cModSelect').innerHTML = '<option value="">-- Chon Module --</option>' + p.modules.map(m => `<option value="${m.module_id}">${m.module_name}</option>`).join('');
-  document.getElementById('cAssignee').innerHTML = '<option value="">-- Tu dong gan --</option>' + p.members.map(m => `<option value="${m.user_id}">${m.user?.full_name||'N/A'} (${m.project_role})</option>`).join('');
-}
-
-function triggerTriage() {
-  clearTimeout(triageTimer);
-  triageTimer = setTimeout(async () => {
-    const title = document.getElementById('cTitle').value;
-    const logs = document.getElementById('cLogs').value;
-    const mid = document.getElementById('cModSelect').value;
-    if (!title && !logs) return;
-    try {
-      const r = await fetch(`${API}/triage/analyze`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({title, raw_logs: logs, module_id: mid}) });
-      const d = await r.json();
-      document.getElementById('cSeverity').value = d.suggested_severity;
-      document.getElementById('cType').value = d.suggested_type;
-      document.getElementById('cPriority').value = d.suggested_priority;
-      document.getElementById('triageScore').textContent = d.confidence_score + '%';
-      document.getElementById('triageReasons').innerHTML = d.reasons.join('<br>');
-      if (d.suggested_assignee_id) document.getElementById('cAssignee').value = d.suggested_assignee_id;
-    } catch (e) { console.error(e); }
-  }, 350);
-}
-
-async function submitIssue(e) {
-  e.preventDefault();
-  const body = {
-    project_id: document.getElementById('cProjSelect').value,
-    module_id: document.getElementById('cModSelect').value || null,
-    title: document.getElementById('cTitle').value,
-    description: document.getElementById('cDesc').value,
-    steps_to_reproduce: document.getElementById('cSteps').value,
-    raw_logs: document.getElementById('cLogs').value,
-    environment: document.getElementById('cEnv').value,
-    severity: document.getElementById('cSeverity').value,
-    issue_type: document.getElementById('cType').value,
-    priority: document.getElementById('cPriority').value,
-    assignee_id: document.getElementById('cAssignee').value || null,
-    reporter_id: currentUser.user_id
-  };
-  const r = await fetch(`${API}/issues`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-  const d = await r.json();
-  if (r.ok) { alert('Tao ticket thanh cong! Ma: ' + d.issue_key); document.getElementById('createForm').reset(); switchTab('issuesTab'); }
-  else alert(d.error);
-}
-
-// ====== 5. ISSUE DETAIL MODAL ======
-async function openIssue(id) {
-  const r = await fetch(`${API}/issues/${id}`);
-  activeIssue = await r.json();
-  const i = activeIssue;
-  document.getElementById('mKey').textContent = i.issue_key;
-  document.getElementById('mTitle').textContent = i.title;
-  document.getElementById('mDesc').textContent = i.description || 'Khong co mo ta.';
-  document.getElementById('mSteps').textContent = i.steps_to_reproduce || 'Khong co buoc tai hien.';
-  document.getElementById('mLogs').textContent = i.raw_logs || 'Khong co log.';
-  document.getElementById('mStatus').innerHTML = `<span class="badge badge-${i.status.toLowerCase()}">${i.status}</span>`;
-  document.getElementById('mSev').innerHTML = `<span class="badge badge-${i.severity.toLowerCase()}">${i.severity}</span>`;
-  document.getElementById('mPri').textContent = i.priority;
-  document.getElementById('mType').textContent = i.issue_type;
-  document.getElementById('mEnv').textContent = i.environment;
-  document.getElementById('mReporter').textContent = i.reporter_name;
-  document.getElementById('mAssignee').textContent = i.assignee_name;
-  document.getElementById('mGit').textContent = i.git_commit_ref || 'Chua co';
-  document.getElementById('mSLA').textContent = i.sla_due_date ? new Date(i.sla_due_date).toLocaleString() : 'N/A';
-  document.getElementById('mConf').textContent = i.confidence_score + '%';
-
-  // Populate reassign select
-  const users = await (await fetch(`${API}/auth/users`)).json();
-  document.getElementById('mReassign').innerHTML = users.map(u => `<option value="${u.user_id}" ${u.user_id===i.assignee_id?'selected':''}>${u.full_name}</option>`).join('');
-  document.getElementById('mPriority').value = i.priority;
-  document.getElementById('mSeverity').value = i.severity;
-
-  // Comments
-  document.getElementById('mComments').innerHTML = (i.comments||[]).map(c => `<div style="background:rgba(255,255,255,0.05);padding:6px 10px;border-radius:6px;margin-bottom:4px;"><strong>${c.user_name}</strong> <small style="color:var(--text-muted);float:right;">${new Date(c.created_at).toLocaleTimeString()}</small><div>${c.content}</div></div>`).join('') || '<div style="color:var(--text-muted)">Chua co binh luan</div>';
-
-  // Audit History
-  document.getElementById('mHistory').innerHTML = (i.history||[]).map(h => `<div class="history-item"><span class="field">${h.field_name}</span>: ${h.old_value||'(none)'} &rarr; ${h.new_value||'(none)'} <span style="float:right;color:var(--text-muted);font-size:0.72rem;">${h.user_name} - ${new Date(h.created_at).toLocaleString()}</span></div>`).join('') || '<div style="color:var(--text-muted)">Chua co lich su</div>';
-
-  // Check archived
-  const isArchived = i.project_status === 'ARCHIVED';
-  document.getElementById('mArchivedBadge').style.display = isArchived ? 'inline-block' : 'none';
-  document.getElementById('triageControls').style.display = isArchived ? 'none' : 'block';
-  document.getElementById('mCommentForm').style.display = isArchived ? 'none' : 'flex';
-
-  renderWorkflowBtns(i.status, isArchived);
-  showModal('issueModal');
-}
-
-function renderWorkflowBtns(status, isArchived) {
-  const c = document.getElementById('workflowBtns');
-  c.innerHTML = '';
-  const role = currentUser.role;
-
-  if (isArchived) { c.innerHTML = '<div style="color:var(--accent-warning);font-size:0.8rem;">Du an da Archive. Read-Only.</div>'; return; }
-
-  if (status === 'NEW' || status === 'REOPENED') {
-    if (role === 'DEV' || role === 'PM' || role === 'ADMIN')
-      c.innerHTML += `<button class="btn" onclick="changeStatus('IN_PROGRESS')">Bat dau sua (IN_PROGRESS)</button>`;
-    if (role === 'PM' || role === 'ADMIN') {
-      c.innerHTML += `<button class="btn btn-danger btn-sm" onclick="changeStatus('REJECTED')">Tu choi (REJECTED)</button>`;
-      c.innerHTML += `<button class="btn btn-secondary btn-sm" onclick="changeStatus('DUPLICATE')">Trung lap (DUPLICATE)</button>`;
-      c.innerHTML += `<button class="btn btn-warning btn-sm" onclick="changeStatus('DEFERRED')">Hoan lai (DEFERRED)</button>`;
+    function applyTheme(t) {
+      document.documentElement.setAttribute('data-bs-theme', t);
     }
-  } else if (status === 'IN_PROGRESS') {
-    if (role === 'DEV' || role === 'ADMIN')
-      c.innerHTML += `<button class="btn btn-success" onclick="changeStatus('RESOLVED')">Da fix code (RESOLVED)</button>`;
-  } else if (status === 'RESOLVED') {
-    if (role === 'QA' || role === 'ADMIN') {
-      c.innerHTML += `<button class="btn btn-success" onclick="changeStatus('CLOSED')">Re-test Dat - Dong (CLOSED)</button>`;
-      c.innerHTML += `<button class="btn btn-danger" onclick="changeStatus('REOPENED')">Re-test Fail - Mo lai (REOPENED)</button>`;
+
+    // ----------------- AUTHENTICATION -----------------
+    function checkSession() {
+      const savedUser = localStorage.getItem('its_user');
+      if (savedUser) {
+        currentUser.value = JSON.parse(savedUser);
+        isLoggedIn.value = true;
+      }
     }
-  } else if (status === 'CLOSED') {
-    c.innerHTML = '<div style="color:var(--accent-success);font-size:0.8rem;">Ticket da duoc dong hoan tat.</div>';
-  } else if (status === 'REJECTED' || status === 'DUPLICATE') {
-    c.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;">Ticket da bi tu choi / trung lap.</div>';
-  } else if (status === 'DEFERRED') {
-    if (role === 'PM' || role === 'ADMIN')
-      c.innerHTML += `<button class="btn" onclick="changeStatus('NEW')">Mo lai de xu ly (NEW)</button>`;
+
+    async function handleLogin(customEmail = null) {
+      const emailToUse = customEmail || loginEmail.value;
+      if (!emailToUse) return;
+      loading.value = true;
+      try {
+        const res = await fetch(`${API}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailToUse })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          const u = data.user;
+          u.role = u.global_role === 'ADMIN' ? 'ADMIN' : (roleMap[u.user_id] || 'DEV');
+          currentUser.value = u;
+          localStorage.setItem('its_user', JSON.stringify(u));
+          isLoggedIn.value = true;
+          showToast(`Xin chào, ${u.full_name}! (${u.role})`, 'success');
+          await initAppData();
+        } else {
+          showToast(data.error || 'Đăng nhập thất bại!', 'danger');
+        }
+      } catch (err) {
+        showToast('Lỗi kết nối máy chủ API!', 'danger');
+      } finally {
+        loading.value = false;
+      }
+    }
+
+    function handleLogout() {
+      localStorage.removeItem('its_user');
+      currentUser.value = null;
+      isLoggedIn.value = false;
+      showToast('Đã đăng xuất thành công.', 'info');
+    }
+
+    async function switchRoleQuick(email) {
+      await handleLogin(email);
+    }
+
+    // ----------------- INIT & TAB ROUTING -----------------
+    async function initAppData() {
+      await Promise.all([loadUsers(), loadProjects(), loadIssues()]);
+      if (activeTab.value === 'dashboard') {
+        await loadDashboard();
+      }
+    }
+
+    async function setTab(tabName) {
+      activeTab.value = tabName;
+      if (tabName === 'dashboard') {
+        await loadDashboard();
+      } else if (tabName === 'issues') {
+        await loadIssues();
+      } else if (tabName === 'triage') {
+        await prepareCreateForm();
+      } else if (tabName === 'projects') {
+        await loadProjects();
+      } else if (tabName === 'admin') {
+        await loadUsers();
+      }
+    }
+
+    // ----------------- USERS API -----------------
+    async function loadUsers() {
+      try {
+        const res = await fetch(`${API}/auth/users`);
+        allUsers.value = await res.json();
+      } catch (e) {
+        console.error('Lỗi tải danh sách người dùng:', e);
+      }
+    }
+
+    async function handleCreateUser() {
+      if (!newUser.full_name || !newUser.email) return;
+      try {
+        const res = await fetch(`${API}/auth/create_user`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newUser)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Tạo tài khoản thành công!', 'success');
+          newUser.full_name = '';
+          newUser.email = '';
+          newUser.global_role = 'USER';
+          closeBootstrapModal('createUserModal');
+          loadUsers();
+        } else {
+          showToast(data.error || 'Lỗi khi tạo user', 'danger');
+        }
+      } catch (e) {
+        showToast('Lỗi kết nối!', 'danger');
+      }
+    }
+
+    async function toggleUserStatus(user) {
+      const newStatus = user.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+      try {
+        const res = await fetch(`${API}/auth/users/${user.user_id}/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus })
+        });
+        if (res.ok) {
+          user.status = newStatus;
+          showToast(`Đã đổi trạng thái sang ${newStatus}`, 'info');
+        }
+      } catch (e) {
+        showToast('Lỗi cập nhật trạng thái', 'danger');
+      }
+    }
+
+    // ----------------- DASHBOARD -----------------
+    async function loadDashboard() {
+      try {
+        const res = await fetch(`${API}/dashboard/summary`);
+        dashboardData.value = await res.json();
+        nextTick(renderCharts);
+      } catch (e) {
+        console.error('Lỗi tải dashboard:', e);
+      }
+    }
+
+    function renderCharts() {
+      if (!dashboardData.value) return;
+      const isDark = theme.value === 'dark';
+      const textColor = isDark ? '#94a3b8' : '#475569';
+      const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+
+      const sev = dashboardData.value.severity_breakdown || {};
+      const stat = dashboardData.value.status_breakdown || {};
+
+      // Severity Doughnut Chart
+      const sevCtx = document.getElementById('sevChartCanvas');
+      if (sevCtx) {
+        if (sevChart) sevChart.destroy();
+        sevChart = new Chart(sevCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Critical', 'Major', 'Minor', 'Trivial'],
+            datasets: [{
+              data: [sev.CRITICAL || 0, sev.MAJOR || 0, sev.MINOR || 0, sev.TRIVIAL || 0],
+              backgroundColor: ['#ef4444', '#f59e0b', '#38bdf8', '#94a3b8'],
+              borderWidth: 2,
+              borderColor: isDark ? '#1a1f2e' : '#ffffff'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom', labels: { color: textColor, font: { family: 'Plus Jakarta Sans', size: 11 } } }
+            },
+            cutout: '68%'
+          }
+        });
+      }
+
+      // Status Bar Chart
+      const statCtx = document.getElementById('statChartCanvas');
+      if (statCtx) {
+        if (statChart) statChart.destroy();
+        statChart = new Chart(statCtx, {
+          type: 'bar',
+          data: {
+            labels: ['New', 'In Progress', 'Resolved', 'Closed', 'Reopened', 'Rejected', 'Deferred'],
+            datasets: [{
+              label: 'Số lượng Bugs',
+              data: [
+                stat.NEW || 0, stat.IN_PROGRESS || 0, stat.RESOLVED || 0,
+                stat.CLOSED || 0, stat.REOPENED || 0, stat.REJECTED || 0, stat.DEFERRED || 0
+              ],
+              backgroundColor: ['#3b82f6', '#f59e0b', '#8b5cf6', '#10b981', '#ef4444', '#64748b', '#475569'],
+              borderRadius: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { display: false }, ticks: { color: textColor, font: { size: 10 } } },
+              y: { grid: { color: gridColor }, ticks: { color: textColor, stepSize: 1 }, beginAtZero: true }
+            }
+          }
+        });
+      }
+    }
+
+    // ----------------- PROJECTS -----------------
+    async function loadProjects() {
+      try {
+        const res = await fetch(`${API}/projects`);
+        projects.value = await res.json();
+      } catch (e) {
+        console.error('Lỗi tải dự án:', e);
+      }
+    }
+
+    async function viewProjectDetail(pid) {
+      try {
+        const res = await fetch(`${API}/projects/${pid}`);
+        activeProjectDetail.value = await res.json();
+        openBootstrapModal('projectDetailModal');
+      } catch (e) {
+        showToast('Lỗi tải chi tiết dự án', 'danger');
+      }
+    }
+
+    async function handleCreateProject() {
+      if (!newProject.project_key || !newProject.project_name) return;
+      try {
+        const res = await fetch(`${API}/projects`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newProject)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Tạo dự án thành công!', 'success');
+          newProject.project_key = '';
+          newProject.project_name = '';
+          newProject.description = '';
+          newProject.pm_id = '';
+          closeBootstrapModal('createProjectModal');
+          loadProjects();
+        } else {
+          showToast(data.error || 'Lỗi tạo dự án', 'danger');
+        }
+      } catch (e) {
+        showToast('Lỗi kết nối!', 'danger');
+      }
+    }
+
+    async function toggleArchiveProject(project) {
+      const targetStatus = project.status === 'ARCHIVED' ? 'ACTIVE' : 'ARCHIVED';
+      try {
+        const res = await fetch(`${API}/projects/${project.project_id}/archive`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: targetStatus })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          project.status = targetStatus;
+          showToast(data.message || `Dự án đã chuyển sang ${targetStatus}`, 'info');
+        } else {
+          showToast(data.error || 'Lỗi thao tác!', 'danger');
+        }
+      } catch (e) {
+        showToast('Lỗi kết nối!', 'danger');
+      }
+    }
+
+    function openAddMemberModal(pid) {
+      newMember.project_id = pid;
+      newMember.user_id = allUsers.value.length ? allUsers.value[0].user_id : '';
+      newMember.project_role = 'DEV';
+      openBootstrapModal('addMemberModal');
+    }
+
+    async function handleAddMember() {
+      if (!newMember.user_id) return;
+      try {
+        const res = await fetch(`${API}/projects/${newMember.project_id}/members`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newMember)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Thêm thành viên thành công!', 'success');
+          closeBootstrapModal('addMemberModal');
+          loadProjects();
+          if (activeProjectDetail.value && activeProjectDetail.value.project_id === newMember.project_id) {
+            viewProjectDetail(newMember.project_id);
+          }
+        } else {
+          showToast(data.error || 'Lỗi thêm thành viên', 'danger');
+        }
+      } catch (e) {
+        showToast('Lỗi kết nối!', 'danger');
+      }
+    }
+
+    async function handleRemoveMember(pid, uid) {
+      if (!confirm('Bạn có chắc chắn muốn xóa thành viên này khỏi dự án?')) return;
+      try {
+        await fetch(`${API}/projects/${pid}/members/${uid}`, { method: 'DELETE' });
+        showToast('Đã xóa thành viên khỏi dự án', 'info');
+        viewProjectDetail(pid);
+        loadProjects();
+      } catch (e) {
+        showToast('Lỗi khi xóa thành viên', 'danger');
+      }
+    }
+
+    function openAddModuleModal(pid) {
+      newModule.project_id = pid;
+      newModule.module_name = '';
+      newModule.description = '';
+      newModule.default_assignee_id = '';
+      openBootstrapModal('createModuleModal');
+    }
+
+    async function handleCreateModule() {
+      if (!newModule.module_name) return;
+      try {
+        const res = await fetch(`${API}/projects/${newModule.project_id}/modules`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newModule)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Tạo module thành công!', 'success');
+          closeBootstrapModal('createModuleModal');
+          loadProjects();
+          if (activeProjectDetail.value && activeProjectDetail.value.project_id === newModule.project_id) {
+            viewProjectDetail(newModule.project_id);
+          }
+        } else {
+          showToast(data.error || 'Lỗi tạo module', 'danger');
+        }
+      } catch (e) {
+        showToast('Lỗi kết nối!', 'danger');
+      }
+    }
+
+    async function handleDeleteModule(pid, mid) {
+      if (!confirm('Bạn có chắc chắn muốn xóa module này?')) return;
+      try {
+        await fetch(`${API}/projects/${pid}/modules/${mid}`, { method: 'DELETE' });
+        showToast('Đã xóa module', 'info');
+        viewProjectDetail(pid);
+        loadProjects();
+      } catch (e) {
+        showToast('Lỗi khi xóa module', 'danger');
+      }
+    }
+
+    // ----------------- ISSUES & KANBAN -----------------
+    async function loadIssues() {
+      try {
+        let url = `${API}/issues?`;
+        if (filterProject.value) url += `project_id=${filterProject.value}&`;
+        if (filterStatus.value) url += `status=${filterStatus.value}&`;
+        if (filterSeverity.value) url += `severity=${filterSeverity.value}&`;
+        if (searchQuery.value) url += `search=${encodeURIComponent(searchQuery.value)}&`;
+        if (myIssuesOnly.value && currentUser.value) url += `assignee_id=${currentUser.value.user_id}&`;
+
+        const res = await fetch(url);
+        issues.value = await res.json();
+      } catch (e) {
+        console.error('Lỗi tải danh sách issues:', e);
+      }
+    }
+
+    // Kanban columns grouping
+    const kanbanColumns = [
+      { id: 'NEW', title: 'Mới tạo (NEW)', color: '#3b82f6', icon: 'bi-plus-circle' },
+      { id: 'IN_PROGRESS', title: 'Đang xử lý (IN_PROGRESS)', color: '#f59e0b', icon: 'bi-gear-wide-connected' },
+      { id: 'RESOLVED', title: 'Đã Fix (RESOLVED)', color: '#8b5cf6', icon: 'bi-check2-circle' },
+      { id: 'CLOSED', title: 'Đã Đóng (CLOSED)', color: '#10b981', icon: 'bi-shield-check' }
+    ];
+
+    function getIssuesByStatus(status) {
+      return issues.value.filter(i => {
+        if (status === 'NEW') return i.status === 'NEW' || i.status === 'REOPENED';
+        return i.status === status;
+      });
+    }
+
+    // ----------------- LIVE AUTO-TRIAGE -----------------
+    async function prepareCreateForm() {
+      if (projects.value.length > 0 && !createForm.project_id) {
+        createForm.project_id = projects.value[0].project_id;
+        await onProjectChangeInCreate();
+      }
+    }
+
+    async function onProjectChangeInCreate() {
+      const pid = createForm.project_id;
+      if (!pid) return;
+      try {
+        const res = await fetch(`${API}/projects/${pid}`);
+        const p = await res.json();
+        currentProjectModules.value = p.modules || [];
+        currentProjectMembers.value = p.members || [];
+        if (currentProjectModules.value.length > 0) {
+          createForm.module_id = currentProjectModules.value[0].module_id;
+        }
+        triggerTriage();
+      } catch (e) {
+        console.error('Lỗi load modules của project:', e);
+      }
+    }
+
+    function triggerTriage() {
+      clearTimeout(triageTimer);
+      triageTimer = setTimeout(async () => {
+        if (!createForm.title && !createForm.raw_logs) {
+          triageResult.confidence_score = 0;
+          triageResult.reasons = ['Nhập tiêu đề hoặc dán console log để hệ thống phân tích tự động...'];
+          return;
+        }
+        try {
+          const res = await fetch(`${API}/triage/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: createForm.title,
+              raw_logs: createForm.raw_logs,
+              module_id: createForm.module_id
+            })
+          });
+          const d = await res.json();
+          triageResult.confidence_score = d.confidence_score || 0;
+          triageResult.suggested_severity = d.suggested_severity;
+          triageResult.suggested_type = d.suggested_type;
+          triageResult.suggested_priority = d.suggested_priority;
+          triageResult.suggested_assignee_id = d.suggested_assignee_id;
+          triageResult.reasons = d.reasons || [];
+
+          // Auto update fields
+          createForm.severity = d.suggested_severity;
+          createForm.issue_type = d.suggested_type;
+          createForm.priority = d.suggested_priority;
+          if (d.suggested_assignee_id) {
+            createForm.assignee_id = d.suggested_assignee_id;
+          }
+        } catch (e) {
+          console.error('Lỗi Auto-Triage:', e);
+        }
+      }, 300);
+    }
+
+    // Quick Sample Logs for demoing Auto-Triage
+    function fillSampleLog(type) {
+      if (type === '500_payment') {
+        createForm.title = 'Lỗi HTTP 500 khi xử lý thanh toán VNPay Gateway';
+        createForm.raw_logs = `[ERROR] 2026-09-25 14:22:01,112 payment_service.py:145 - NullPointerException: VNPay secret key is missing in config!
+HTTP/1.1 500 Internal Server Error
+Traceback (most recent call last):
+  File "/app/services/payment.py", line 145, in process_vnpay
+    raise DatabaseConnectionError("Unable to acquire pooled connection for transaction log")
+DatabaseConnectionError: Pool exhausted (max 20 reached).`;
+      } else if (type === 'ui_css') {
+        createForm.title = 'Vỡ giao diện nút bấm giỏ hàng trên mobile Safari';
+        createForm.raw_logs = `[WARN] CSS flex-wrap layout overflow on viewport < 375px. Button truncated.`;
+      } else if (type === 'slow_query') {
+        createForm.title = 'Truy vấn danh mục sản phẩm chậm bất thường (> 5s)';
+        createForm.raw_logs = `[WARN] TimeoutError: Slow SQL query execution time 5420ms on table \`products\`. Missing index on category_id.`;
+      }
+      triggerTriage();
+    }
+
+    async function handleCreateIssue() {
+      if (!createForm.project_id || !createForm.title) {
+        showToast('Vui lòng chọn Dự án và nhập Tiêu đề lỗi!', 'warning');
+        return;
+      }
+      try {
+        const payload = {
+          ...createForm,
+          reporter_id: currentUser.value ? currentUser.value.user_id : 1
+        };
+        const res = await fetch(`${API}/issues`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`Đã tạo thành công ticket ${data.issue_key}!`, 'success');
+          // Reset form
+          createForm.title = '';
+          createForm.description = '';
+          createForm.steps_to_reproduce = '';
+          createForm.raw_logs = '';
+          triageResult.confidence_score = 0;
+          setTab('issues');
+        } else {
+          showToast(data.error || 'Lỗi khi tạo ticket', 'danger');
+        }
+      } catch (e) {
+        showToast('Lỗi kết nối!', 'danger');
+      }
+    }
+
+    // ----------------- ISSUE DETAIL MODAL & WORKFLOW -----------------
+    async function openIssue(id) {
+      try {
+        const res = await fetch(`${API}/issues/${id}`);
+        activeIssue.value = await res.json();
+        triageEdit.assignee_id = activeIssue.value.assignee_id || '';
+        triageEdit.priority = activeIssue.value.priority || 'MEDIUM';
+        triageEdit.severity = activeIssue.value.severity || 'MAJOR';
+        commentInput.value = '';
+        openBootstrapModal('issueDetailModal');
+      } catch (e) {
+        showToast('Lỗi tải chi tiết ticket', 'danger');
+      }
+    }
+
+    async function handleSaveTriage() {
+      if (!activeIssue.value) return;
+      try {
+        const res = await fetch(`${API}/issues/${activeIssue.value.issue_id}/triage`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: currentUser.value.user_id,
+            assignee_id: triageEdit.assignee_id || null,
+            priority: triageEdit.priority,
+            severity: triageEdit.severity
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Đã lưu thay đổi phân loại & gán Dev!', 'success');
+          openIssue(activeIssue.value.issue_id);
+          loadIssues();
+        } else {
+          showToast(data.error || 'Lỗi cập nhật', 'danger');
+        }
+      } catch (e) {
+        showToast('Lỗi kết nối!', 'danger');
+      }
+    }
+
+    async function handleChangeStatus(newStatus) {
+      if (!activeIssue.value) return;
+      let gitRef = null;
+      if (newStatus === 'RESOLVED') {
+        gitRef = prompt('Nhập mã Git Commit Hash hoặc PR Link (ví dụ: commit-7a9b2c):', '');
+        if (gitRef === null) return;
+      }
+
+      try {
+        const res = await fetch(`${API}/issues/${activeIssue.value.issue_id}/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: newStatus,
+            user_id: currentUser.value.user_id,
+            git_commit_ref: gitRef
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(data.message || `Đã chuyển sang trạng thái ${newStatus}`, 'success');
+          openIssue(activeIssue.value.issue_id);
+          loadIssues();
+        } else {
+          showToast(data.error || 'Không đủ quyền thực hiện thao tác này!', 'danger');
+        }
+      } catch (e) {
+        showToast('Lỗi kết nối!', 'danger');
+      }
+    }
+
+    async function handlePostComment() {
+      const content = commentInput.value.trim();
+      if (!content || !activeIssue.value) return;
+      try {
+        const res = await fetch(`${API}/issues/${activeIssue.value.issue_id}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: currentUser.value.user_id,
+            content
+          })
+        });
+        if (res.ok) {
+          commentInput.value = '';
+          openIssue(activeIssue.value.issue_id);
+        } else {
+          const d = await res.json();
+          showToast(d.error || 'Lỗi gửi bình luận', 'danger');
+        }
+      } catch (e) {
+        showToast('Lỗi kết nối!', 'danger');
+      }
+    }
+
+    // ----------------- BOOTSTRAP MODAL HELPERS -----------------
+    function openBootstrapModal(modalId) {
+      const el = document.getElementById(modalId);
+      if (el) {
+        let modal = bootstrap.Modal.getInstance(el);
+        if (!modal) modal = new bootstrap.Modal(el);
+        modal.show();
+      }
+    }
+
+    function closeBootstrapModal(modalId) {
+      const el = document.getElementById(modalId);
+      if (el) {
+        const modal = bootstrap.Modal.getInstance(el);
+        if (modal) modal.hide();
+      }
+    }
+
+    // ----------------- FORMATTING HELPERS -----------------
+    function getSeverityBadge(sev) {
+      if (!sev) return 'badge-sev-trivial';
+      return `badge-sev-${sev.toLowerCase()}`;
+    }
+
+    function getStatusBadge(st) {
+      if (!st) return 'badge-st-new';
+      return `badge-st-${st.toLowerCase()}`;
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return 'N/A';
+      return new Date(dateStr).toLocaleString('vi-VN', {
+        hour: '2-digit', minute: '2-digit',
+        day: '2-digit', month: '2-digit', year: 'numeric'
+      });
+    }
+
+    return {
+      theme, toggleTheme,
+      isLoggedIn, currentUser, demoAccounts, loginEmail, handleLogin, handleLogout, switchRoleQuick,
+      activeTab, setTab, viewMode, loading, toast, showToast,
+      allUsers, handleCreateUser, toggleUserStatus, newUser,
+      dashboardData,
+      projects, viewProjectDetail, activeProjectDetail, handleCreateProject, newProject,
+      toggleArchiveProject, openAddMemberModal, handleAddMember, handleRemoveMember, newMember,
+      openAddModuleModal, handleCreateModule, handleDeleteModule, newModule,
+      issues, loadIssues, filterProject, filterStatus, filterSeverity, searchQuery, myIssuesOnly,
+      kanbanColumns, getIssuesByStatus,
+      createForm, currentProjectModules, currentProjectMembers, triageResult, triggerTriage,
+      onProjectChangeInCreate, fillSampleLog, handleCreateIssue,
+      activeIssue, openIssue, triageEdit, handleSaveTriage, handleChangeStatus,
+      commentInput, handlePostComment,
+      getSeverityBadge, getStatusBadge, formatDate
+    };
   }
-}
-
-async function changeStatus(newStatus) {
-  let gitRef = null;
-  if (newStatus === 'RESOLVED') {
-    gitRef = prompt('Nhap Git Commit Hash / PR Link:', '');
-    if (gitRef === null) return;
-  }
-  const r = await fetch(`${API}/issues/${activeIssue.issue_id}/status`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status: newStatus, user_id: currentUser.user_id, git_commit_ref: gitRef }) });
-  const d = await r.json();
-  if (r.ok) { alert(d.message); openIssue(activeIssue.issue_id); loadIssues(); }
-  else alert(d.error);
-}
-
-async function saveTriage() {
-  if (currentUser.role !== 'PM' && currentUser.role !== 'DEV' && currentUser.role !== 'ADMIN') { alert('Khong co quyen!'); return; }
-  const r = await fetch(`${API}/issues/${activeIssue.issue_id}/triage`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ user_id: currentUser.user_id, assignee_id: document.getElementById('mReassign').value, priority: document.getElementById('mPriority').value, severity: document.getElementById('mSeverity').value }) });
-  const d = await r.json();
-  if (r.ok) { alert(d.message); openIssue(activeIssue.issue_id); loadIssues(); }
-  else alert(d.error);
-}
-
-async function postComment() {
-  const input = document.getElementById('mCommentInput');
-  const content = input.value.trim();
-  if (!content) return;
-  const r = await fetch(`${API}/issues/${activeIssue.issue_id}/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ user_id: currentUser.user_id, content }) });
-  if (r.ok) { input.value = ''; openIssue(activeIssue.issue_id); }
-  else { const d = await r.json(); alert(d.error); }
-}
-
-// ====== 6. ADMIN ======
-async function loadUsers() {
-  if (currentUser.role !== 'ADMIN') return;
-  const r = await fetch(`${API}/auth/users`);
-  const users = await r.json();
-  document.getElementById('usersBody').innerHTML = users.map(u => {
-    const active = u.status === 'ACTIVE';
-    return `<tr>
-      <td>${u.user_id}</td><td><strong>${u.full_name}</strong></td><td>${u.email}</td>
-      <td><span class="badge badge-status">${u.global_role}</span></td>
-      <td><span class="badge ${active?'badge-closed':'badge-critical'}">${u.status}</span></td>
-      <td><button class="btn ${active?'btn-danger':'btn-success'} btn-sm" onclick="toggleUser(${u.user_id},'${active?'INACTIVE':'ACTIVE'}')">${active?'Vo hieu hoa':'Kich hoat'}</button></td>
-    </tr>`;
-  }).join('');
-}
-
-async function toggleUser(uid, status) {
-  await fetch(`${API}/auth/users/${uid}/status`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status}) });
-  loadUsers();
-}
-
-async function createUser(e) {
-  e.preventDefault();
-  const r = await fetch(`${API}/auth/create_user`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ full_name: document.getElementById('nuName').value, email: document.getElementById('nuEmail').value, global_role: document.getElementById('nuRole').value }) });
-  if (r.ok) { alert('Tao tai khoan thanh cong!'); closeModal('createUserModal'); loadUsers(); }
-  else { const d = await r.json(); alert(d.error); }
-}
+}).mount('#app');

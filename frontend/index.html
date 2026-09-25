@@ -1,223 +1,1126 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" data-bs-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Issue Tracking & Auto-Triage System</title>
-  <meta name="description" content="He thong Quan ly Loi va Phan loai Su co Tu dong">
+  <title>Issue Tracking & Auto-Triage System (ITS)</title>
+  <meta name="description" content="Hệ thống Quản lý Lỗi và Phân loại Sự cố Tự động bằng AI Heuristics">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Bootstrap 5.3 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  
+  <!-- Custom Modern Theme Styles -->
   <link rel="stylesheet" href="css/style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
-  <div id="loginScreen" style="display:flex; height:100vh; align-items:center; justify-content:center; background:var(--bg-dark);">
-    <div class="glass-card" style="width:100%; max-width:400px; padding:2rem; text-align:center;">
-      <div class="brand-icon" style="margin: 0 auto 1rem; width:50px; height:50px; font-size:24px;">ITS</div>
-      <h2 style="margin-bottom:0.5rem;">Đăng nhập ITS</h2>
-      <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.5rem;">Hệ thống Quản lý Lỗi & Phân loại Sự cố</p>
-      <form onsubmit="handleLogin(event)">
-        <div class="form-group" style="text-align:left;">
-          <label>Email *</label>
-          <input type="email" id="loginEmail" class="form-control" required placeholder="VD: admin@company.com" value="admin@company.com">
+<div id="app" v-cloak>
+
+  <!-- ==================== TOAST NOTIFICATION ==================== -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 2000;">
+    <div class="toast align-items-center text-white border-0 shadow-lg" :class="[`bg-${toast.type}`, { show: toast.show }]" role="alert">
+      <div class="d-flex">
+        <div class="toast-body d-flex align-items-center gap-2">
+          <i class="bi bi-info-circle-fill"></i>
+          <span>{{ toast.message }}</span>
         </div>
-        <button type="submit" class="btn" style="width:100%; margin-top:1rem;">Đăng nhập</button>
-      </form>
-      <div style="margin-top:1rem; font-size:0.8rem; color:var(--text-muted);">
-        Email test: admin@company.com, pm@company.com, qa.lead@company.com, dev.backend@company.com
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" @click="toast.show = false"></button>
       </div>
     </div>
   </div>
 
-  <div id="appScreen" style="display:none;">
-    <!-- HEADER -->
-    <header class="app-header">
-      <div class="brand">
-        <div class="brand-icon">ITS</div>
-        <div>
-          <div class="brand-title">ISSUE TRACKING & AUTO-TRIAGE</div>
-          <small style="color:var(--text-muted);font-size:0.7rem;">He thong Quan ly Loi & Phan loai Su co</small>
+  <!-- ==================== 1. LOGIN SCREEN ==================== -->
+  <div v-if="!isLoggedIn" class="min-vh-100 d-flex align-items-center justify-content-center p-3" style="background: radial-gradient(circle at top, #1e1b4b 0%, #0b0f19 70%);">
+    <div class="custom-card p-4 p-md-5" style="width: 100%; max-width: 480px;">
+      <div class="text-center mb-4">
+        <div class="brand-badge mb-3 px-3 py-2 fs-5">
+          <i class="bi bi-cpu-fill me-2"></i> ITS AUTO-TRIAGE
+        </div>
+        <h3 class="fw-bold mb-1">Đăng Nhập Hệ Thống</h3>
+        <p class="text-secondary small">Quản lý Lỗi, Phân loại Sự cố & Điều phối Thông minh</p>
+      </div>
+
+      <form @submit.prevent="handleLogin()">
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Email Tài Khoản</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+            <input type="email" class="form-control" v-model="loginEmail" required placeholder="name@company.com">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold mb-3 shadow" :disabled="loading">
+          <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
+          <i v-else class="bi bi-box-arrow-in-right me-1"></i> Đăng Nhập
+        </button>
+      </form>
+
+      <!-- Quick Role Presets -->
+      <div class="pt-3 border-top border-secondary-subtle">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="small text-muted fw-semibold">⚡ Đăng nhập nhanh để test phân quyền:</span>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <button v-for="acc in demoAccounts" :key="acc.email" 
+                  class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1"
+                  @click="handleLogin(acc.email)">
+            <i class="bi" :class="acc.icon"></i>
+            <span>{{ acc.role }}</span>
+          </button>
         </div>
       </div>
-      <div class="user-info-container" style="display:flex; align-items:center; gap:10px;">
-        <div style="text-align:right;">
-          <div id="headerUserName" style="font-weight:600; font-size:0.9rem;"></div>
-          <div id="headerUserRole" style="font-size:0.75rem; color:var(--text-muted);"></div>
+    </div>
+  </div>
+
+  <!-- ==================== 2. MAIN APP DASHBOARD ==================== -->
+  <div v-else class="d-flex flex-column min-vh-100">
+
+    <!-- Top Navbar -->
+    <header class="app-navbar py-2 px-3 px-lg-4 sticky-top">
+      <div class="container-fluid d-flex justify-content-between align-items-center">
+        <!-- Brand -->
+        <div class="d-flex align-items-center gap-3">
+          <div class="brand-badge">
+            <i class="bi bi-cpu-fill me-1"></i> ITS 2.0
+          </div>
+          <div class="d-none d-md-block">
+            <h6 class="mb-0 fw-bold" style="letter-spacing: 0.3px;">ISSUE TRACKING & AUTO-TRIAGE</h6>
+            <small class="text-secondary" style="font-size: 0.72rem;">Phân loại lỗi thông minh & Quản trị quy trình</small>
+          </div>
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="handleLogout()">Đăng xuất</button>
+
+        <!-- Quick Role Switcher & User Profile -->
+        <div class="d-flex align-items-center gap-2 gap-md-3">
+          
+          <!-- Theme Toggle -->
+          <button class="btn btn-sm btn-outline-secondary rounded-circle" @click="toggleTheme" title="Đổi giao diện Sáng/Tối">
+            <i class="bi" :class="theme === 'dark' ? 'bi-sun-fill text-warning' : 'bi-moon-stars-fill text-primary'"></i>
+          </button>
+
+          <!-- Quick Role Switch Dropdown -->
+          <div class="dropdown d-none d-sm-block">
+            <button class="btn btn-sm btn-outline-primary dropdown-toggle d-flex align-items-center gap-1" data-bs-toggle="dropdown">
+              <i class="bi bi-shuffle"></i>
+              <span>Đổi Role: <strong>{{ currentUser.role }}</strong></span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+              <li v-for="acc in demoAccounts" :key="acc.email">
+                <a class="dropdown-item d-flex align-items-center justify-content-between small py-2" href="#" @click.prevent="switchRoleQuick(acc.email)">
+                  <span><i class="bi me-2" :class="acc.icon"></i>{{ acc.name }}</span>
+                  <span class="badge bg-secondary-subtle text-body ms-2">{{ acc.role }}</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <!-- User Info -->
+          <div class="d-flex align-items-center gap-2 ps-2 border-start border-secondary-subtle">
+            <div class="text-end d-none d-sm-block">
+              <div class="fw-bold small">{{ currentUser.full_name }}</div>
+              <span class="badge bg-primary-subtle text-primary" style="font-size: 0.68rem;">{{ currentUser.role }}</span>
+            </div>
+            <button class="btn btn-sm btn-outline-danger" @click="handleLogout" title="Đăng xuất">
+              <i class="bi bi-box-arrow-right"></i>
+            </button>
+          </div>
+        </div>
       </div>
     </header>
 
-    <div class="main-container">
-    <!-- TABS -->
-    <div class="nav-tabs" id="mainNavTabs">
-      <button class="tab-btn active" id="tab-dashboard" onclick="switchTab('dashboardTab')">Dashboard</button>
-      <button class="tab-btn" id="tab-issues" onclick="switchTab('issuesTab')">Danh Sach Ticket</button>
-      <button class="tab-btn" id="tab-create" onclick="switchTab('createIssueTab')">Bao Loi & Auto-Triage</button>
-      <button class="tab-btn" id="tab-projects" onclick="switchTab('projectsTab')">Quan Ly Du An</button>
-      <button class="tab-btn" id="tab-admin" onclick="switchTab('adminTab')" style="display:none;">Quan Tri He Thong</button>
-    </div>
+    <!-- Main Container -->
+    <main class="container-fluid px-3 px-lg-4 py-3 flex-grow-1">
 
-    <!-- ====== TAB 1: DASHBOARD ====== -->
-    <section id="dashboardTab" class="tab-content"></section>
+      <!-- Navigation Tabs -->
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4 pb-2 border-bottom border-secondary-subtle">
+        <ul class="nav nav-pills nav-pills-custom">
+          <li class="nav-item">
+            <button class="nav-link" :class="{ active: activeTab === 'dashboard' }" @click="setTab('dashboard')">
+              <i class="bi bi-speedometer2"></i> Dashboard
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" :class="{ active: activeTab === 'issues' }" @click="setTab('issues')">
+              <i class="bi bi-ticket-detailed-fill"></i> Danh Sách Ticket
+              <span v-if="issues.length" class="badge rounded-pill bg-white text-dark ms-1" style="font-size: 0.65rem;">{{ issues.length }}</span>
+            </button>
+          </li>
+          <li class="nav-item" v-if="currentUser.role !== 'DEV'">
+            <button class="nav-link" :class="{ active: activeTab === 'triage' }" @click="setTab('triage')">
+              <i class="bi bi-magic"></i> Báo Lỗi & Auto-Triage
+            </button>
+          </li>
+          <li class="nav-item" v-if="currentUser.role === 'PM' || currentUser.role === 'ADMIN'">
+            <button class="nav-link" :class="{ active: activeTab === 'projects' }" @click="setTab('projects')">
+              <i class="bi bi-folder-fill"></i> Quản Lý Dự Án
+            </button>
+          </li>
+          <li class="nav-item" v-if="currentUser.role === 'ADMIN'">
+            <button class="nav-link" :class="{ active: activeTab === 'admin' }" @click="setTab('admin')">
+              <i class="bi bi-shield-lock-fill"></i> Quản Trị Hệ Thống
+            </button>
+          </li>
+        </ul>
 
-    <!-- ====== TAB 2: ISSUE BOARD ====== -->
-    <section id="issuesTab" class="tab-content" style="display:none;"></section>
-
-    <!-- ====== TAB 3: BAO LOI & AUTO-TRIAGE (QA) ====== -->
-    <section id="createIssueTab" class="tab-content" style="display:none;"></section>
-
-    <!-- ====== TAB 4: QUAN LY DU AN (PM/Admin) ====== -->
-    <section id="projectsTab" class="tab-content" style="display:none;"></section>
-
-    <!-- ====== TAB 5: ADMIN HE THONG ====== -->
-    <section id="adminTab" class="tab-content" style="display:none;"></section>
-  </div>
-
-  <!-- ============ MODAL: CHI TIET TICKET ============ -->
-  <div id="issueModal" class="modal-overlay">
-    <div class="modal-content">
-      <button class="close-modal" onclick="closeModal('issueModal')">&times;</button>
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-        <div><span class="badge badge-status" id="mKey">-</span><h2 id="mTitle" style="margin-top:4px;font-size:1.15rem;">-</h2></div>
-        <div id="mArchivedBadge" style="display:none;" class="badge badge-critical">READ-ONLY (ARCHIVED)</div>
+        <!-- Right Quick Actions -->
+        <div class="d-flex align-items-center gap-2" v-if="activeTab === 'issues'">
+          <div class="btn-group btn-group-sm">
+            <button class="btn" :class="viewMode === 'table' ? 'btn-primary' : 'btn-outline-secondary'" @click="viewMode = 'table'">
+              <i class="bi bi-table me-1"></i> Bảng
+            </button>
+            <button class="btn" :class="viewMode === 'kanban' ? 'btn-primary' : 'btn-outline-secondary'" @click="viewMode = 'kanban'">
+              <i class="bi bi-kanban me-1"></i> Kanban Board
+            </button>
+          </div>
+        </div>
       </div>
-      <hr style="border:0;border-top:var(--glass-border);margin:0.75rem 0;">
-      <div style="display:grid;grid-template-columns:5fr 3fr;gap:1.25rem;">
-        <!-- LEFT -->
-        <div>
-          <h4 style="font-size:0.9rem;">Mo ta:</h4>
-          <p id="mDesc" style="white-space:pre-line;color:#cbd5e1;font-size:0.85rem;margin-bottom:0.75rem;"></p>
-          <h4 style="font-size:0.9rem;">Cac buoc tai hien:</h4>
-          <p id="mSteps" style="white-space:pre-line;color:#cbd5e1;font-size:0.85rem;margin-bottom:0.75rem;"></p>
-          <h4 style="font-size:0.9rem;">Log he thong:</h4>
-          <pre id="mLogs" style="background:rgba(0,0,0,0.5);padding:8px;border-radius:6px;color:#38bdf8;font-size:0.75rem;overflow-x:auto;max-height:120px;"></pre>
 
-          <!-- TRIAGE CONTROLS (PM/Dev) -->
-          <div id="triageControls" style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);padding:10px;border-radius:8px;margin-top:0.75rem;">
-            <h4 style="font-size:0.85rem;">Dieu phoi & Gan lai (Triage):</h4>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px;">
-              <div><label style="font-size:0.75rem;">Gan Dev:</label><select id="mReassign" class="form-control" style="padding:4px;font-size:0.82rem;"></select></div>
-              <div><label style="font-size:0.75rem;">Priority:</label><select id="mPriority" class="form-control" style="padding:4px;font-size:0.82rem;"><option>HIGH</option><option>MEDIUM</option><option>LOW</option></select></div>
-              <div><label style="font-size:0.75rem;">Severity:</label><select id="mSeverity" class="form-control" style="padding:4px;font-size:0.82rem;"><option>CRITICAL</option><option>MAJOR</option><option>MINOR</option><option>TRIVIAL</option></select></div>
+      <!-- ========================================================== -->
+      <!-- TAB 1: DASHBOARD ANALYTICS -->
+      <!-- ========================================================== -->
+      <section v-if="activeTab === 'dashboard'">
+        <div v-if="dashboardData">
+          <!-- Metric Widgets Grid -->
+          <div class="row g-3 mb-4">
+            <div class="col-6 col-lg-2">
+              <div class="custom-card metric-widget metric-primary d-flex align-items-center justify-content-between">
+                <div>
+                  <small class="text-secondary fw-semibold">Tổng Ticket</small>
+                  <h3 class="fw-bold mt-1 mb-0">{{ dashboardData.total_issues }}</h3>
+                </div>
+                <div class="metric-icon"><i class="bi bi-stack"></i></div>
+              </div>
             </div>
-            <button class="btn btn-secondary btn-sm" style="margin-top:6px;width:100%;" onclick="saveTriage()">Luu Thay Doi</button>
+            <div class="col-6 col-lg-2">
+              <div class="custom-card metric-widget metric-danger d-flex align-items-center justify-content-between">
+                <div>
+                  <small class="text-secondary fw-semibold">Lỗi Critical</small>
+                  <h3 class="fw-bold text-danger mt-1 mb-0">{{ dashboardData.critical_issues }}</h3>
+                </div>
+                <div class="metric-icon"><i class="bi bi-exclamation-octagon-fill"></i></div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-2">
+              <div class="custom-card metric-widget metric-warning d-flex align-items-center justify-content-between">
+                <div>
+                  <small class="text-secondary fw-semibold">Tỷ Lệ Reopen</small>
+                  <h3 class="fw-bold text-warning mt-1 mb-0">{{ dashboardData.reopen_rate_percent }}%</h3>
+                </div>
+                <div class="metric-icon"><i class="bi bi-arrow-repeat"></i></div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-2">
+              <div class="custom-card metric-widget metric-success d-flex align-items-center justify-content-between">
+                <div>
+                  <small class="text-secondary fw-semibold">MTTR Trung Bình</small>
+                  <h3 class="fw-bold text-success mt-1 mb-0">{{ dashboardData.mttr_hours_avg }}h</h3>
+                </div>
+                <div class="metric-icon"><i class="bi bi-clock-history"></i></div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-2">
+              <div class="custom-card metric-widget metric-info d-flex align-items-center justify-content-between">
+                <div>
+                  <small class="text-secondary fw-semibold">Đang Xử Lý</small>
+                  <h3 class="fw-bold text-info mt-1 mb-0">{{ dashboardData.in_progress_issues }}</h3>
+                </div>
+                <div class="metric-icon"><i class="bi bi-gear-fill"></i></div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-2">
+              <div class="custom-card metric-widget metric-success d-flex align-items-center justify-content-between">
+                <div>
+                  <small class="text-secondary fw-semibold">Đã Giải Quyết</small>
+                  <h3 class="fw-bold text-success mt-1 mb-0">{{ dashboardData.closed_issues }}</h3>
+                </div>
+                <div class="metric-icon"><i class="bi bi-check-all"></i></div>
+              </div>
+            </div>
           </div>
 
-          <!-- COMMENTS -->
-          <h4 style="margin-top:0.75rem;font-size:0.9rem;">Binh luan & Trao doi:</h4>
-          <div id="mComments" style="max-height:160px;overflow-y:auto;margin:6px 0;font-size:0.82rem;"></div>
-          <div id="mCommentForm" style="display:flex;gap:6px;">
-            <input type="text" id="mCommentInput" class="form-control" placeholder="Viet binh luan...">
-            <button class="btn btn-secondary btn-sm" onclick="postComment()">Gui</button>
+          <!-- Charts Grid -->
+          <div class="row g-4 mb-4">
+            <div class="col-12 col-lg-6">
+              <div class="custom-card p-3 p-md-4 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h6 class="fw-bold mb-0"><i class="bi bi-pie-chart-fill text-primary me-2"></i>Phân Bố Mức Độ Nghiêm Trọng (Severity)</h6>
+                </div>
+                <div style="height: 250px;">
+                  <canvas id="sevChartCanvas"></canvas>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-lg-6">
+              <div class="custom-card p-3 p-md-4 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h6 class="fw-bold mb-0"><i class="bi bi-bar-chart-fill text-info me-2"></i>Trạng Thái Vòng Đời Bug (Workflow Status)</h6>
+                </div>
+                <div style="height: 250px;">
+                  <canvas id="statChartCanvas"></canvas>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <!-- AUDIT LOG / HISTORY -->
-          <h4 style="margin-top:0.75rem;font-size:0.9rem;">Lich su thay doi (Audit Log):</h4>
-          <div id="mHistory" style="max-height:140px;overflow-y:auto;margin-top:4px;"></div>
+          <!-- Performance Tables -->
+          <div class="row g-4">
+            <div class="col-12 col-lg-6">
+              <div class="custom-card p-3 p-md-4">
+                <h6 class="fw-bold mb-3"><i class="bi bi-award-fill text-warning me-2"></i>Năng Suất Đội Ngũ QA (Số Bug Báo Cáo)</h6>
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Tên Thành Viên QA</th>
+                        <th class="text-end">Số Lượng Bug</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="q in dashboardData.qa_stats" :key="q.user_id">
+                        <td><i class="bi bi-person-circle me-2 text-secondary"></i>{{ q.full_name }}</td>
+                        <td class="text-end"><span class="badge bg-primary-subtle text-primary fw-bold">{{ q.count }}</span></td>
+                      </tr>
+                      <tr v-if="!dashboardData.qa_stats || !dashboardData.qa_stats.length">
+                        <td colspan="2" class="text-center text-muted small py-3">Chưa có dữ liệu</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+              <div class="custom-card p-3 p-md-4">
+                <h6 class="fw-bold mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>Năng Suất Đội Ngũ Dev (Số Bug Đã Fix)</h6>
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Tên Lập Trình Viên (Dev)</th>
+                        <th class="text-end">Bug Đã Fix</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="d in dashboardData.dev_stats" :key="d.user_id">
+                        <td><i class="bi bi-code-square me-2 text-secondary"></i>{{ d.full_name }}</td>
+                        <td class="text-end"><span class="badge bg-success-subtle text-success fw-bold">{{ d.count }}</span></td>
+                      </tr>
+                      <tr v-if="!dashboardData.dev_stats || !dashboardData.dev_stats.length">
+                        <td colspan="2" class="text-center text-muted small py-3">Chưa có dữ liệu</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <!-- RIGHT -->
-        <div style="background:rgba(255,255,255,0.03);padding:0.75rem;border-radius:10px;">
-          <h4 style="font-size:0.88rem;">Thong tin quan tri</h4>
-          <div style="margin-top:8px;font-size:0.82rem;line-height:1.9;">
-            <div><strong>Trang thai:</strong> <span id="mStatus">-</span></div>
-            <div><strong>Severity:</strong> <span id="mSev">-</span></div>
-            <div><strong>Priority:</strong> <span id="mPri">-</span></div>
-            <div><strong>Type:</strong> <span id="mType">-</span></div>
-            <div><strong>Moi truong:</strong> <span id="mEnv">-</span></div>
-            <div><strong>Reporter:</strong> <span id="mReporter">-</span></div>
-            <div><strong>Dev:</strong> <span id="mAssignee">-</span></div>
-            <div><strong>Git Ref:</strong> <span id="mGit" style="color:#38bdf8;">-</span></div>
-            <div><strong>SLA:</strong> <span id="mSLA" style="color:#f59e0b;">-</span></div>
-            <div><strong>Confidence:</strong> <span id="mConf" style="color:#818cf8;">-</span></div>
+      </section>
+
+      <!-- ========================================================== -->
+      <!-- TAB 2: ISSUES (TABLE & KANBAN VIEW) -->
+      <!-- ========================================================== -->
+      <section v-if="activeTab === 'issues'">
+        <div class="custom-card p-3 p-md-4 mb-4">
+          <!-- Filter Controls Bar -->
+          <div class="row g-2 align-items-center mb-3">
+            <div class="col-12 col-md-3">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" class="form-control" placeholder="Tìm kiếm theo mã, tiêu đề..." v-model="searchQuery" @input="loadIssues">
+              </div>
+            </div>
+            <div class="col-6 col-md-2">
+              <select class="form-select form-select-sm" v-model="filterProject" @change="loadIssues">
+                <option value="">-- Tất cả dự án --</option>
+                <option v-for="p in projects" :key="p.project_id" :value="p.project_id">{{ p.project_key }} - {{ p.project_name }}</option>
+              </select>
+            </div>
+            <div class="col-6 col-md-2">
+              <select class="form-select form-select-sm" v-model="filterStatus" @change="loadIssues">
+                <option value="">-- Trạng thái --</option>
+                <option>NEW</option><option>IN_PROGRESS</option><option>RESOLVED</option>
+                <option>CLOSED</option><option>REOPENED</option><option>REJECTED</option><option>DEFERRED</option>
+              </select>
+            </div>
+            <div class="col-6 col-md-2">
+              <select class="form-select form-select-sm" v-model="filterSeverity" @change="loadIssues">
+                <option value="">-- Mức độ (Severity) --</option>
+                <option>CRITICAL</option><option>MAJOR</option><option>MINOR</option><option>TRIVIAL</option>
+              </select>
+            </div>
+            <div class="col-6 col-md-3 d-flex align-items-center justify-content-end">
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="myIssuesCheck" v-model="myIssuesOnly" @change="loadIssues">
+                <label class="form-check-label small fw-semibold" for="myIssuesCheck">Chỉ xem ticket của tôi</label>
+              </div>
+            </div>
           </div>
 
-          <h4 style="margin-top:1rem;font-size:0.88rem;">Chuyen trang thai Workflow:</h4>
-          <div id="workflowBtns" style="display:flex;flex-direction:column;gap:6px;margin-top:6px;"></div>
+          <!-- TABLE VIEW -->
+          <div v-if="viewMode === 'table'" class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr class="table-light">
+                  <th style="width: 110px;">Mã Ticket</th>
+                  <th>Tiêu Đề Lỗi</th>
+                  <th>Phân Hệ (Module)</th>
+                  <th>Severity</th>
+                  <th>Trạng Thái</th>
+                  <th>Độ Tin Cậy</th>
+                  <th>Dev Phụ Trách</th>
+                  <th class="text-end">Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="i in issues" :key="i.issue_id" style="cursor: pointer;" @click="openIssue(i.issue_id)">
+                  <td><span class="badge bg-secondary-subtle text-body fw-bold">{{ i.issue_key }}</span></td>
+                  <td>
+                    <div class="fw-semibold text-truncate" style="max-width: 320px;">{{ i.title }}</div>
+                    <small class="text-muted" style="font-size: 0.72rem;">{{ i.project_key }} &bull; {{ formatDate(i.created_at) }}</small>
+                  </td>
+                  <td><span class="badge bg-body-tertiary text-body border">{{ i.module_name || 'Mặc định' }}</span></td>
+                  <td><span class="badge-status" :class="getSeverityBadge(i.severity)">{{ i.severity }}</span></td>
+                  <td><span class="badge-status" :class="getStatusBadge(i.status)">{{ i.status }}</span></td>
+                  <td>
+                    <div class="d-flex align-items-center gap-1">
+                      <div class="progress flex-grow-1" style="height: 6px; width: 50px;">
+                        <div class="progress-bar bg-primary" :style="{ width: i.confidence_score + '%' }"></div>
+                      </div>
+                      <span class="small fw-bold text-primary">{{ i.confidence_score }}%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="small fw-medium">{{ i.assignee_name || 'Chưa gán' }}</div>
+                  </td>
+                  <td class="text-end">
+                    <button class="btn btn-sm btn-outline-primary" @click.stop="openIssue(i.issue_id)">
+                      Chi tiết <i class="bi bi-chevron-right ms-1"></i>
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="!issues.length">
+                  <td colspan="8" class="text-center text-muted py-5">
+                    <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                    Không tìm thấy ticket nào phù hợp với bộ lọc.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- KANBAN BOARD VIEW -->
+          <div v-else class="kanban-board pt-2">
+            <div v-for="col in kanbanColumns" :key="col.id" class="kanban-column">
+              <div class="kanban-column-header" :style="{ borderTop: '3px solid ' + col.color }">
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi" :class="col.icon" :style="{ color: col.color }"></i>
+                  <span>{{ col.title }}</span>
+                </div>
+                <span class="badge bg-secondary-subtle text-body">{{ getIssuesByStatus(col.id).length }}</span>
+              </div>
+              <div class="kanban-cards-container">
+                <div v-for="card in getIssuesByStatus(col.id)" :key="card.issue_id" class="kanban-card shadow-sm" @click="openIssue(card.issue_id)">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="badge bg-secondary-subtle text-body fw-bold" style="font-size: 0.7rem;">{{ card.issue_key }}</span>
+                    <span class="badge-status" :class="getSeverityBadge(card.severity)">{{ card.severity }}</span>
+                  </div>
+                  <h6 class="fw-bold mb-2 small" style="line-height: 1.3;">{{ card.title }}</h6>
+                  <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top border-secondary-subtle text-muted" style="font-size: 0.72rem;">
+                    <span><i class="bi bi-person me-1"></i>{{ card.assignee_name || 'Unassigned' }}</span>
+                    <span class="text-primary fw-semibold">{{ card.confidence_score }}% AI</span>
+                  </div>
+                </div>
+                <div v-if="!getIssuesByStatus(col.id).length" class="text-center text-muted small py-4">
+                  Trống
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ========================================================== -->
+      <!-- TAB 3: LIVE AUTO-TRIAGE & CREATE ISSUE -->
+      <!-- ========================================================== -->
+      <section v-if="activeTab === 'triage'">
+        <div class="row g-4">
+          <!-- Left: Input Form -->
+          <div class="col-12 col-lg-7">
+            <div class="custom-card p-3 p-md-4">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0"><i class="bi bi-magic text-primary me-2"></i>Báo Cáo Lỗi & Phân Tích Thông Minh</h5>
+              </div>
+
+              <!-- Quick Demo Samples -->
+              <div class="p-2 mb-3 rounded bg-body-tertiary border d-flex flex-wrap align-items-center gap-2">
+                <small class="text-secondary fw-semibold"><i class="bi bi-lightning-charge-fill text-warning me-1"></i>Thử nhanh mẫu log:</small>
+                <button type="button" class="btn btn-xs btn-outline-danger" @click="fillSampleLog('500_payment')">Lỗi 500 VNPay (Critical)</button>
+                <button type="button" class="btn btn-xs btn-outline-warning" @click="fillSampleLog('slow_query')">Slow Query SQL (Major)</button>
+                <button type="button" class="btn btn-xs btn-outline-info" @click="fillSampleLog('ui_css')">Lỗi Vỡ UI CSS (Minor)</button>
+              </div>
+
+              <form @submit.prevent="handleCreateIssue">
+                <div class="row g-3 mb-3">
+                  <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold">Dự án áp dụng *</label>
+                    <select class="form-select" v-model="createForm.project_id" @change="onProjectChangeInCreate" required>
+                      <option value="" disabled>-- Chọn dự án --</option>
+                      <option v-for="p in projects" :key="p.project_id" :value="p.project_id" :disabled="p.status === 'ARCHIVED'">
+                        {{ p.project_key }} - {{ p.project_name }} {{ p.status === 'ARCHIVED' ? '[Đã đóng]' : '' }}
+                      </option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold">Phân hệ (Module) *</label>
+                    <select class="form-select" v-model="createForm.module_id" @change="triggerTriage" required>
+                      <option value="">-- Mặc định --</option>
+                      <option v-for="m in currentProjectModules" :key="m.module_id" :value="m.module_id">
+                        {{ m.module_name }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label small fw-semibold">Tiêu đề lỗi (Bug Title) *</label>
+                  <input type="text" class="form-control" v-model="createForm.title" @input="triggerTriage" required placeholder="Ví dụ: Lỗi HTTP 500 khi xác thực đơn hàng...">
+                </div>
+
+                <div class="row g-3 mb-3">
+                  <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold">Mô tả chi tiết</label>
+                    <textarea class="form-control" rows="3" v-model="createForm.description" placeholder="Mô tả hiện tượng lỗi..."></textarea>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <label class="form-label small fw-semibold">Các bước tái hiện (Steps)</label>
+                    <textarea class="form-control" rows="3" v-model="createForm.steps_to_reproduce" placeholder="1. Truy cập trang...&#10;2. Bấm nút thanh toán..."></textarea>
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label small fw-semibold d-flex justify-content-between">
+                    <span>Console Log / Stacktrace <span class="text-primary">(Auto-Triage sẽ phân tích tự động tại đây)</span></span>
+                  </label>
+                  <textarea class="form-control code-log-box" rows="5" v-model="createForm.raw_logs" @input="triggerTriage" placeholder="Dán đoạn log console hoặc traceback hệ thống vào đây..."></textarea>
+                </div>
+
+                <div class="row g-3 mb-4">
+                  <div class="col-6 col-md-3">
+                    <label class="form-label small fw-semibold">Môi trường</label>
+                    <select class="form-select form-select-sm" v-model="createForm.environment">
+                      <option>DEV</option><option>STAGING</option><option>PRODUCTION</option>
+                    </select>
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <label class="form-label small fw-semibold">Severity</label>
+                    <select class="form-select form-select-sm" v-model="createForm.severity">
+                      <option>CRITICAL</option><option>MAJOR</option><option>MINOR</option><option>TRIVIAL</option>
+                    </select>
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <label class="form-label small fw-semibold">Priority</label>
+                    <select class="form-select form-select-sm" v-model="createForm.priority">
+                      <option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+                    </select>
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <label class="form-label small fw-semibold">Gán Dev</label>
+                    <select class="form-select form-select-sm" v-model="createForm.assignee_id">
+                      <option value="">-- Tự động --</option>
+                      <option v-for="m in currentProjectMembers" :key="m.user_id" :value="m.user_id">
+                        {{ m.user ? m.user.full_name : 'N/A' }} ({{ m.project_role }})
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="d-flex justify-content-end">
+                  <button type="submit" class="btn btn-primary px-4 py-2 fw-semibold shadow">
+                    <i class="bi bi-send-check me-1"></i> Lưu & Tạo Ticket
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Right: Live Auto-Triage Inspector -->
+          <div class="col-12 col-lg-5">
+            <div class="custom-card p-3 p-md-4 triage-highlight-box sticky-top" style="top: 80px;">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <h6 class="fw-bold mb-0 text-primary d-flex align-items-center gap-2">
+                  <i class="bi bi-robot fs-5"></i> BỘ MÁY AUTO-TRIAGE HEURISTICS
+                </h6>
+                <span class="badge bg-primary-subtle text-primary fw-bold fs-6">{{ triageResult.confidence_score }}%</span>
+              </div>
+
+              <div class="mb-3">
+                <div class="d-flex justify-content-between small text-secondary mb-1">
+                  <span>Độ tin cậy dự đoán (Confidence):</span>
+                  <span class="fw-bold">{{ triageResult.confidence_score }}%</span>
+                </div>
+                <div class="triage-meter">
+                  <div class="triage-meter-fill" :style="{ width: triageResult.confidence_score + '%' }"></div>
+                </div>
+              </div>
+
+              <!-- Real-time Predictions -->
+              <div class="row g-2 mb-3">
+                <div class="col-6">
+                  <div class="p-2 rounded bg-body-tertiary border">
+                    <small class="text-secondary d-block" style="font-size: 0.72rem;">ĐỀ XUẤT SEVERITY</small>
+                    <span class="badge-status mt-1" :class="getSeverityBadge(triageResult.suggested_severity)">{{ triageResult.suggested_severity }}</span>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="p-2 rounded bg-body-tertiary border">
+                    <small class="text-secondary d-block" style="font-size: 0.72rem;">LOẠI SỰ CỐ (TYPE)</small>
+                    <span class="badge bg-secondary-subtle text-body mt-1 fw-bold">{{ triageResult.suggested_type }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Detected Keywords & Rules -->
+              <div>
+                <small class="text-secondary fw-semibold d-block mb-2"><i class="bi bi-journal-code me-1"></i>Căn cứ phân tích từ Log & Title:</small>
+                <ul class="list-unstyled mb-0" style="font-size: 0.82rem;">
+                  <li v-for="(reason, idx) in triageResult.reasons" :key="idx" class="mb-1 d-flex align-items-start gap-2">
+                    <i class="bi bi-check-circle-fill text-success mt-1" style="font-size: 0.75rem;"></i>
+                    <span>{{ reason }}</span>
+                  </li>
+                  <li v-if="!triageResult.reasons.length" class="text-muted">
+                    Chờ bạn dán log hoặc nhập tiêu đề...
+                  </li>
+                </ul>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================== -->
+      <!-- TAB 4: PROJECT MANAGEMENT (PM/ADMIN) -->
+      <!-- ========================================================== -->
+      <section v-if="activeTab === 'projects'">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="fw-bold mb-0"><i class="bi bi-folder2-open text-primary me-2"></i>Danh Sách Dự Án Đang Quản Lý</h5>
+          <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createProjectModal">
+            <i class="bi bi-plus-lg me-1"></i> Tạo Dự Án Mới
+          </button>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12 col-md-6 col-xl-4" v-for="p in projects" :key="p.project_id">
+            <div class="custom-card custom-card-hover p-3 p-md-4 h-100 d-flex flex-column justify-content-between">
+              <div>
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <span class="badge bg-primary-subtle text-primary fw-bold">{{ p.project_key }}</span>
+                  <span class="badge" :class="p.status === 'ARCHIVED' ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'">{{ p.status }}</span>
+                </div>
+                <h6 class="fw-bold mb-1">{{ p.project_name }}</h6>
+                <p class="text-secondary small mb-3" style="min-height: 38px;">{{ p.description || 'Chưa có mô tả dự án.' }}</p>
+                <div class="d-flex gap-3 small text-secondary mb-3 pb-3 border-bottom border-secondary-subtle">
+                  <span><i class="bi bi-people me-1"></i><strong>{{ p.members_count }}</strong> thành viên</span>
+                  <span><i class="bi bi-grid me-1"></i><strong>{{ p.modules_count }}</strong> phân hệ</span>
+                </div>
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-sm btn-outline-primary" @click="viewProjectDetail(p.project_id)">
+                  <i class="bi bi-eye me-1"></i> Chi tiết
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @click="openAddMemberModal(p.project_id)" :disabled="p.status === 'ARCHIVED'">
+                  <i class="bi bi-person-plus"></i> + User
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @click="openAddModuleModal(p.project_id)" :disabled="p.status === 'ARCHIVED'">
+                  <i class="bi bi-node-plus"></i> + Module
+                </button>
+                <button class="btn btn-sm ms-auto" :class="p.status === 'ARCHIVED' ? 'btn-outline-success' : 'btn-outline-danger'" @click="toggleArchiveProject(p)">
+                  {{ p.status === 'ARCHIVED' ? 'Mở lại' : 'Lưu trữ' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================== -->
+      <!-- TAB 5: USER ADMIN (ADMIN ONLY) -->
+      <!-- ========================================================== -->
+      <section v-if="activeTab === 'admin'">
+        <div class="custom-card p-3 p-md-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0"><i class="bi bi-shield-lock-fill text-danger me-2"></i>Quản Trị Người Dùng & Phân Quyền Hệ Thống</h5>
+            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createUserModal">
+              <i class="bi bi-person-plus-fill me-1"></i> Thêm Tài Khoản
+            </button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>ID</th>
+                  <th>Họ và Tên</th>
+                  <th>Email Đăng Nhập</th>
+                  <th>Global Role</th>
+                  <th>Trạng Thái</th>
+                  <th class="text-end">Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="u in allUsers" :key="u.user_id">
+                  <td>#{{ u.user_id }}</td>
+                  <td class="fw-semibold">{{ u.full_name }}</td>
+                  <td>{{ u.email }}</td>
+                  <td><span class="badge" :class="u.global_role === 'ADMIN' ? 'bg-danger' : 'bg-primary'">{{ u.global_role }}</span></td>
+                  <td>
+                    <span class="badge" :class="u.status === 'ACTIVE' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'">{{ u.status }}</span>
+                  </td>
+                  <td class="text-end">
+                    <button class="btn btn-sm" :class="u.status === 'ACTIVE' ? 'btn-outline-danger' : 'btn-outline-success'" @click="toggleUserStatus(u)">
+                      {{ u.status === 'ACTIVE' ? 'Vô hiệu hóa' : 'Kích hoạt' }}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- ========================================================== -->
+  <!-- MODALS SECTION -->
+  <!-- ========================================================== -->
+
+  <!-- 1. MODAL: ISSUE DETAIL & WORKFLOW -->
+  <div class="modal fade" id="issueDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content custom-card border-0">
+        <div class="modal-header border-secondary-subtle">
+          <div class="d-flex align-items-center gap-2" v-if="activeIssue">
+            <span class="badge bg-secondary-subtle text-body fw-bold fs-6">{{ activeIssue.issue_key }}</span>
+            <span class="badge-status" :class="getStatusBadge(activeIssue.status)">{{ activeIssue.status }}</span>
+            <span v-if="activeIssue.project_status === 'ARCHIVED'" class="badge bg-danger">READ-ONLY (ARCHIVED)</span>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body p-4" v-if="activeIssue">
+          <div class="row g-4">
+            <!-- Left 8 Cols: Details, Logs, Comments, History -->
+            <div class="col-12 col-lg-8">
+              <h4 class="fw-bold mb-3">{{ activeIssue.title }}</h4>
+
+              <div class="mb-3">
+                <h6 class="fw-semibold small text-secondary">Mô tả hiện tượng lỗi:</h6>
+                <p class="p-3 rounded bg-body-tertiary border small mb-0" style="white-space: pre-line;">{{ activeIssue.description || 'Chưa có mô tả.' }}</p>
+              </div>
+
+              <div class="mb-3" v-if="activeIssue.steps_to_reproduce">
+                <h6 class="fw-semibold small text-secondary">Các bước tái hiện (Steps to Reproduce):</h6>
+                <p class="p-3 rounded bg-body-tertiary border small mb-0" style="white-space: pre-line;">{{ activeIssue.steps_to_reproduce }}</p>
+              </div>
+
+              <div class="mb-3" v-if="activeIssue.raw_logs">
+                <h6 class="fw-semibold small text-secondary">Log hệ thống & Stacktrace:</h6>
+                <pre class="code-log-box mb-0">{{ activeIssue.raw_logs }}</pre>
+              </div>
+
+              <!-- Triage & Reassign Controls (For PM / Dev / Admin) -->
+              <div class="p-3 mb-4 rounded border bg-primary-subtle" v-if="activeIssue.project_status !== 'ARCHIVED'">
+                <h6 class="fw-bold small text-primary mb-2"><i class="bi bi-sliders me-1"></i>Điều phối & Tái phân loại (Triage):</h6>
+                <div class="row g-2">
+                  <div class="col-12 col-md-4">
+                    <label class="small text-secondary">Gán Dev xử lý:</label>
+                    <select class="form-select form-select-sm" v-model="triageEdit.assignee_id">
+                      <option value="">-- Chưa gán --</option>
+                      <option v-for="u in allUsers" :key="u.user_id" :value="u.user_id">{{ u.full_name }}</option>
+                    </select>
+                  </div>
+                  <div class="col-6 col-md-4">
+                    <label class="small text-secondary">Priority:</label>
+                    <select class="form-select form-select-sm" v-model="triageEdit.priority">
+                      <option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+                    </select>
+                  </div>
+                  <div class="col-6 col-md-4">
+                    <label class="small text-secondary">Severity:</label>
+                    <select class="form-select form-select-sm" v-model="triageEdit.severity">
+                      <option>CRITICAL</option><option>MAJOR</option><option>MINOR</option><option>TRIVIAL</option>
+                    </select>
+                  </div>
+                </div>
+                <button class="btn btn-sm btn-primary mt-2 w-100" @click="handleSaveTriage">
+                  <i class="bi bi-save me-1"></i> Lưu Thay Đổi Phân Loại
+                </button>
+              </div>
+
+              <!-- Comments Stream -->
+              <div class="mb-4">
+                <h6 class="fw-semibold small text-secondary mb-3"><i class="bi bi-chat-dots me-1"></i>Bình luận & Trao đổi ({{ (activeIssue.comments || []).length }}):</h6>
+                <div class="mb-3" style="max-height: 220px; overflow-y: auto;">
+                  <div v-for="c in activeIssue.comments" :key="c.comment_id" class="comment-bubble">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <strong class="small">{{ c.user_name }}</strong>
+                      <span class="text-secondary" style="font-size: 0.72rem;">{{ formatDate(c.created_at) }}</span>
+                    </div>
+                    <div>{{ c.content }}</div>
+                  </div>
+                  <div v-if="!activeIssue.comments || !activeIssue.comments.length" class="text-muted small">
+                    Chưa có bình luận nào.
+                  </div>
+                </div>
+
+                <div class="input-group" v-if="activeIssue.project_status !== 'ARCHIVED'">
+                  <input type="text" class="form-control form-control-sm" placeholder="Nhập bình luận hoặc ghi chú kỹ thuật..." v-model="commentInput" @keyup.enter="handlePostComment">
+                  <button class="btn btn-sm btn-primary" @click="handlePostComment">Gửi</button>
+                </div>
+              </div>
+
+              <!-- Audit History Timeline -->
+              <div>
+                <h6 class="fw-semibold small text-secondary mb-2"><i class="bi bi-clock-history me-1"></i>Lịch sử biến động (Audit Log):</h6>
+                <div class="timeline-list">
+                  <div v-for="h in activeIssue.history" :key="h.history_id" class="timeline-item">
+                    <strong>{{ h.user_name }}</strong> đã thay đổi <span class="badge bg-secondary-subtle text-body">{{ h.field_name }}</span>: 
+                    <code>{{ h.old_value || '(trống)' }}</code> &rarr; <code>{{ h.new_value }}</code>
+                    <div class="text-secondary" style="font-size: 0.7rem;">{{ formatDate(h.created_at) }}</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Right 4 Cols: Meta Info & Workflow Actions -->
+            <div class="col-12 col-lg-4">
+              <div class="p-3 rounded bg-body-tertiary border mb-3">
+                <h6 class="fw-bold small text-secondary mb-3">THÔNG TIN QUẢN TRỊ</h6>
+                <dl class="row mb-0 small">
+                  <dt class="col-5 text-secondary">Dự án:</dt>
+                  <dd class="col-7 fw-semibold">{{ activeIssue.project_name }}</dd>
+
+                  <dt class="col-5 text-secondary">Phân hệ:</dt>
+                  <dd class="col-7">{{ activeIssue.module_name || 'N/A' }}</dd>
+
+                  <dt class="col-5 text-secondary">Mức độ (Sev):</dt>
+                  <dd class="col-7"><span class="badge-status" :class="getSeverityBadge(activeIssue.severity)">{{ activeIssue.severity }}</span></dd>
+
+                  <dt class="col-5 text-secondary">Priority:</dt>
+                  <dd class="col-7 fw-semibold">{{ activeIssue.priority }}</dd>
+
+                  <dt class="col-5 text-secondary">Loại sự cố:</dt>
+                  <dd class="col-7">{{ activeIssue.issue_type }}</dd>
+
+                  <dt class="col-5 text-secondary">Môi trường:</dt>
+                  <dd class="col-7">{{ activeIssue.environment }}</dd>
+
+                  <dt class="col-5 text-secondary">Người báo:</dt>
+                  <dd class="col-7">{{ activeIssue.reporter_name }}</dd>
+
+                  <dt class="col-5 text-secondary">Dev xử lý:</dt>
+                  <dd class="col-7 fw-bold text-primary">{{ activeIssue.assignee_name || 'Chưa gán' }}</dd>
+
+                  <dt class="col-5 text-secondary">Git Commit Ref:</dt>
+                  <dd class="col-7 font-monospace text-info">{{ activeIssue.git_commit_ref || 'Chưa cập nhật' }}</dd>
+
+                  <dt class="col-5 text-secondary">SLA Deadline:</dt>
+                  <dd class="col-7 text-warning fw-medium">{{ formatDate(activeIssue.sla_due_date) }}</dd>
+                </dl>
+              </div>
+
+              <!-- Workflow Transition Action Buttons -->
+              <div class="p-3 rounded bg-body-tertiary border">
+                <h6 class="fw-bold small text-secondary mb-3"><i class="bi bi-arrow-left-right me-1"></i>CHUYỂN TRẠNG THÁI WORKFLOW</h6>
+                
+                <div v-if="activeIssue.project_status === 'ARCHIVED'" class="text-danger small">
+                  Dự án đã lưu trữ. Không thể luân chuyển trạng thái.
+                </div>
+
+                <div v-else class="d-grid gap-2">
+                  <!-- NEW / REOPENED -->
+                  <template v-if="activeIssue.status === 'NEW' || activeIssue.status === 'REOPENED'">
+                    <button class="btn btn-warning btn-sm fw-semibold" @click="handleChangeStatus('IN_PROGRESS')">
+                      <i class="bi bi-play-circle me-1"></i> Bắt đầu sửa (IN_PROGRESS)
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" v-if="currentUser.role === 'PM' || currentUser.role === 'ADMIN'" @click="handleChangeStatus('REJECTED')">
+                      <i class="bi bi-x-circle me-1"></i> Từ chối (REJECTED)
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" v-if="currentUser.role === 'PM' || currentUser.role === 'ADMIN'" @click="handleChangeStatus('DUPLICATE')">
+                      <i class="bi bi-files me-1"></i> Trùng lặp (DUPLICATE)
+                    </button>
+                    <button class="btn btn-outline-warning btn-sm" v-if="currentUser.role === 'PM' || currentUser.role === 'ADMIN'" @click="handleChangeStatus('DEFERRED')">
+                      <i class="bi bi-pause-circle me-1"></i> Hoãn lại (DEFERRED)
+                    </button>
+                  </template>
+
+                  <!-- IN_PROGRESS -->
+                  <template v-else-if="activeIssue.status === 'IN_PROGRESS'">
+                    <button class="btn btn-success btn-sm fw-semibold" @click="handleChangeStatus('RESOLVED')">
+                      <i class="bi bi-check2-circle me-1"></i> Đã fix code (RESOLVED)
+                    </button>
+                  </template>
+
+                  <!-- RESOLVED -->
+                  <template v-else-if="activeIssue.status === 'RESOLVED'">
+                    <button class="btn btn-success btn-sm fw-semibold" @click="handleChangeStatus('CLOSED')">
+                      <i class="bi bi-shield-check me-1"></i> Re-test Đạt & Đóng (CLOSED)
+                    </button>
+                    <button class="btn btn-danger btn-sm fw-semibold" @click="handleChangeStatus('REOPENED')">
+                      <i class="bi bi-arrow-counterclockwise me-1"></i> Re-test Fail & Mở lại (REOPENED)
+                    </button>
+                  </template>
+
+                  <!-- CLOSED -->
+                  <template v-else-if="activeIssue.status === 'CLOSED'">
+                    <div class="alert alert-success py-2 px-3 small mb-0 text-center">
+                      <i class="bi bi-check-circle-fill me-1"></i> Ticket đã hoàn tất.
+                    </div>
+                  </template>
+
+                  <!-- REJECTED / DUPLICATE -->
+                  <template v-else-if="activeIssue.status === 'REJECTED' || activeIssue.status === 'DUPLICATE'">
+                    <div class="alert alert-secondary py-2 px-3 small mb-0 text-center">
+                      Ticket đã bị từ chối / trùng lặp.
+                    </div>
+                  </template>
+
+                  <!-- DEFERRED -->
+                  <template v-else-if="activeIssue.status === 'DEFERRED'">
+                    <button class="btn btn-primary btn-sm fw-semibold" @click="handleChangeStatus('NEW')">
+                      <i class="bi bi-arrow-repeat me-1"></i> Kích hoạt lại (NEW)
+                    </button>
+                  </template>
+                </div>
+              </div>
+
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: TAO USER -->
-  <div id="createUserModal" class="modal-overlay">
-    <div class="modal-content" style="max-width:460px;">
-      <button class="close-modal" onclick="closeModal('createUserModal')">&times;</button>
-      <h3 style="font-size:1rem;">Them Tai Khoan Moi</h3>
-      <form onsubmit="createUser(event)" style="margin-top:0.75rem;">
-        <div class="form-group"><label>Ho Ten *</label><input type="text" id="nuName" class="form-control" required></div>
-        <div class="form-group"><label>Email *</label><input type="email" id="nuEmail" class="form-control" required></div>
-        <div class="form-group"><label>Global Role</label><select id="nuRole" class="form-control"><option value="USER">USER</option><option value="ADMIN">ADMIN</option></select></div>
-        <button type="submit" class="btn" style="width:100%;">Tao Tai Khoan</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: TAO DU AN -->
-  <div id="createProjectModal" class="modal-overlay">
-    <div class="modal-content" style="max-width:500px;">
-      <button class="close-modal" onclick="closeModal('createProjectModal')">&times;</button>
-      <h3 style="font-size:1rem;">Tao Du An Moi</h3>
-      <form onsubmit="createProject(event)" style="margin-top:0.75rem;">
-        <div style="display:grid;grid-template-columns:1fr 2fr;gap:0.75rem;">
-          <div class="form-group"><label>Ma du an (Key) *</label><input type="text" id="npKey" class="form-control" required placeholder="VD: ECOM" maxlength="10"></div>
-          <div class="form-group"><label>Ten du an *</label><input type="text" id="npName" class="form-control" required></div>
+  <!-- 2. MODAL: CREATE PROJECT -->
+  <div class="modal fade" id="createProjectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content custom-card border-0">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">Tạo Dự Án Mới</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-        <div class="form-group"><label>Mo ta</label><textarea id="npDesc" class="form-control"></textarea></div>
-        <div class="form-group"><label>Gan PM</label><select id="npPM" class="form-control"></select></div>
-        <button type="submit" class="btn" style="width:100%;">Tao Du An</button>
-      </form>
+        <form @submit.prevent="handleCreateProject">
+          <div class="modal-body">
+            <div class="row g-2 mb-3">
+              <div class="col-4">
+                <label class="form-label small fw-semibold">Mã Key *</label>
+                <input type="text" class="form-control" v-model="newProject.project_key" placeholder="VD: ECOM" maxlength="10" required>
+              </div>
+              <div class="col-8">
+                <label class="form-label small fw-semibold">Tên Dự Án *</label>
+                <input type="text" class="form-control" v-model="newProject.project_name" placeholder="Tên dự án..." required>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Mô Tả Dự Án</label>
+              <textarea class="form-control" rows="3" v-model="newProject.description"></textarea>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Gán PM Phụ Trách</label>
+              <select class="form-select" v-model="newProject.pm_id">
+                <option value="">-- Chưa gán --</option>
+                <option v-for="u in allUsers" :key="u.user_id" :value="u.user_id">{{ u.full_name }} ({{ u.email }})</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer border-0">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+            <button type="submit" class="btn btn-primary">Tạo Dự Án</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 
-  <!-- MODAL: THEM THANH VIEN -->
-  <div id="addMemberModal" class="modal-overlay">
-    <div class="modal-content" style="max-width:460px;">
-      <button class="close-modal" onclick="closeModal('addMemberModal')">&times;</button>
-      <h3 style="font-size:1rem;">Them Thanh Vien Vao Du An</h3>
-      <input type="hidden" id="amProjId">
-      <form onsubmit="addMember(event)" style="margin-top:0.75rem;">
-        <div class="form-group"><label>Chon nguoi dung</label><select id="amUser" class="form-control"></select></div>
-        <div class="form-group"><label>Vai tro trong du an</label><select id="amRole" class="form-control"><option>PM</option><option selected>DEV</option><option>QA</option></select></div>
-        <button type="submit" class="btn" style="width:100%;">Them Thanh Vien</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: TAO MODULE -->
-  <div id="createModuleModal" class="modal-overlay">
-    <div class="modal-content" style="max-width:460px;">
-      <button class="close-modal" onclick="closeModal('createModuleModal')">&times;</button>
-      <h3 style="font-size:1rem;">Them Module Cho Du An</h3>
-      <input type="hidden" id="cmProjId">
-      <form onsubmit="createModule(event)" style="margin-top:0.75rem;">
-        <div class="form-group"><label>Ten Module *</label><input type="text" id="cmName" class="form-control" required></div>
-        <div class="form-group"><label>Mo ta</label><input type="text" id="cmDesc" class="form-control"></div>
-        <div class="form-group"><label>Dev Mac Dinh (Default Assignee)</label><select id="cmDev" class="form-control"></select></div>
-        <button type="submit" class="btn" style="width:100%;">Luu Module</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: CHI TIET DU AN -->
-  <div id="projectDetailModal" class="modal-overlay">
-    <div class="modal-content" style="max-width:700px;">
-      <button class="close-modal" onclick="closeModal('projectDetailModal')">&times;</button>
-      <h3 id="pdTitle" style="font-size:1rem;">-</h3>
-      <hr style="border:0;border-top:var(--glass-border);margin:0.5rem 0;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
-        <div>
-          <h4 style="font-size:0.88rem;">Thanh vien du an:</h4>
-          <div id="pdMembers" style="margin-top:4px;font-size:0.82rem;"></div>
+  <!-- 3. MODAL: PROJECT DETAILS -->
+  <div class="modal fade" id="projectDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content custom-card border-0" v-if="activeProjectDetail">
+        <div class="modal-header">
+          <div>
+            <span class="badge bg-primary-subtle text-primary me-2">{{ activeProjectDetail.project_key }}</span>
+            <span class="fw-bold">{{ activeProjectDetail.project_name }}</span>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-        <div>
-          <h4 style="font-size:0.88rem;">Modules & Default Assignee:</h4>
-          <div id="pdModules" style="margin-top:4px;font-size:0.82rem;"></div>
+        <div class="modal-body">
+          <div class="row g-4">
+            <!-- Members Column -->
+            <div class="col-12 col-md-6">
+              <h6 class="fw-bold small text-secondary mb-3"><i class="bi bi-people me-1"></i>Thành Viên Dự Án:</h6>
+              <div class="list-group list-group-flush">
+                <div v-for="m in activeProjectDetail.members" :key="m.user_id" class="list-group-item d-flex justify-content-between align-items-center px-0 py-2 bg-transparent">
+                  <div>
+                    <div class="fw-semibold small">{{ m.user ? m.user.full_name : 'N/A' }}</div>
+                    <span class="badge bg-secondary-subtle text-body" style="font-size: 0.68rem;">{{ m.project_role }}</span>
+                  </div>
+                  <button class="btn btn-xs btn-outline-danger" @click="handleRemoveMember(activeProjectDetail.project_id, m.user_id)" :disabled="activeProjectDetail.status === 'ARCHIVED'">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+                <div v-if="!activeProjectDetail.members || !activeProjectDetail.members.length" class="text-muted small">
+                  Chưa có thành viên.
+                </div>
+              </div>
+            </div>
+
+            <!-- Modules Column -->
+            <div class="col-12 col-md-6">
+              <h6 class="fw-bold small text-secondary mb-3"><i class="bi bi-grid me-1"></i>Phân Hệ (Modules):</h6>
+              <div class="list-group list-group-flush">
+                <div v-for="mod in activeProjectDetail.modules" :key="mod.module_id" class="list-group-item d-flex justify-content-between align-items-center px-0 py-2 bg-transparent">
+                  <div>
+                    <div class="fw-semibold small">{{ mod.module_name }}</div>
+                    <small class="text-secondary d-block" style="font-size: 0.72rem;">Dev: {{ mod.default_assignee ? mod.default_assignee.full_name : 'Chưa gán' }}</small>
+                  </div>
+                  <button class="btn btn-xs btn-outline-danger" @click="handleDeleteModule(activeProjectDetail.project_id, mod.module_id)" :disabled="activeProjectDetail.status === 'ARCHIVED'">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+                <div v-if="!activeProjectDetail.modules || !activeProjectDetail.modules.length" class="text-muted small">
+                  Chưa có module.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- 4. MODAL: ADD MEMBER -->
+  <div class="modal fade" id="addMemberModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content custom-card border-0">
+        <div class="modal-header">
+          <h6 class="modal-title fw-bold">Thêm Thành Viên</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form @submit.prevent="handleAddMember">
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Người Dùng</label>
+              <select class="form-select form-select-sm" v-model="newMember.user_id" required>
+                <option v-for="u in allUsers" :key="u.user_id" :value="u.user_id">{{ u.full_name }} ({{ u.email }})</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Vai Trò</label>
+              <select class="form-select form-select-sm" v-model="newMember.project_role">
+                <option>PM</option><option>DEV</option><option>QA</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer border-0">
+            <button type="submit" class="btn btn-sm btn-primary w-100">Lưu Thành Viên</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
+
+  <!-- 5. MODAL: CREATE MODULE -->
+  <div class="modal fade" id="createModuleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content custom-card border-0">
+        <div class="modal-header">
+          <h6 class="modal-title fw-bold">Thêm Module Cho Dự Án</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form @submit.prevent="handleCreateModule">
+          <div class="modal-body">
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Tên Module *</label>
+              <input type="text" class="form-control form-control-sm" v-model="newModule.module_name" required placeholder="VD: Payment Gateway">
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Mô Tả</label>
+              <input type="text" class="form-control form-control-sm" v-model="newModule.description">
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Dev Mặc Định</label>
+              <select class="form-select form-select-sm" v-model="newModule.default_assignee_id">
+                <option value="">-- Chưa gán --</option>
+                <option v-for="u in allUsers" :key="u.user_id" :value="u.user_id">{{ u.full_name }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer border-0">
+            <button type="submit" class="btn btn-sm btn-primary w-100">Tạo Module</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
-  <script src="js/app.js"></script>
+
+  <!-- 6. MODAL: CREATE USER -->
+  <div class="modal fade" id="createUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content custom-card border-0">
+        <div class="modal-header">
+          <h6 class="modal-title fw-bold">Thêm Tài Khoản Mới</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form @submit.prevent="handleCreateUser">
+          <div class="modal-body">
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Họ và Tên *</label>
+              <input type="text" class="form-control form-control-sm" v-model="newUser.full_name" required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Email Đăng Nhập *</label>
+              <input type="email" class="form-control form-control-sm" v-model="newUser.email" required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Global Role</label>
+              <select class="form-select form-select-sm" v-model="newUser.global_role">
+                <option value="USER">USER</option>
+                <option value="ADMIN">ADMIN</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer border-0">
+            <button type="submit" class="btn btn-sm btn-primary w-100">Tạo Người Dùng</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Vue 3 CDN -->
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+<!-- Bootstrap 5.3 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Application Controller -->
+<script src="js/app.js"></script>
+
 </body>
 </html>
