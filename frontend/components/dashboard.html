@@ -1,0 +1,30 @@
+<div class="metrics-grid">
+  <div class="metric-card info"><span class="metric-title">Tong Ticket</span><span class="metric-value" id="statTotal">0</span></div>
+  <div class="metric-card critical"><span class="metric-title">Loi Critical</span><span class="metric-value" id="statCritical">0</span></div>
+  <div class="metric-card warning"><span class="metric-title">Reopen Rate</span><span class="metric-value" id="statReopen">0%</span></div>
+  <div class="metric-card success"><span class="metric-title">MTTR (Gio)</span><span class="metric-value" id="statMTTR">0h</span></div>
+  <div class="metric-card"><span class="metric-title">Dang xu ly</span><span class="metric-value" id="statInProgress">0</span></div>
+  <div class="metric-card success"><span class="metric-title">Da dong</span><span class="metric-value" id="statClosed">0</span></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;">
+  <div class="glass-card">
+    <h3 style="font-size:1rem;">Severity Distribution</h3>
+    <canvas id="severityChart" style="max-height:240px;margin-top:0.5rem;"></canvas>
+  </div>
+  <div class="glass-card">
+    <h3 style="font-size:1rem;">Workflow Status</h3>
+    <canvas id="statusChart" style="max-height:240px;margin-top:0.5rem;"></canvas>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-top:1rem;">
+  <div class="glass-card">
+    <h3 style="font-size:1rem;">Nang suat QA (Bug phat hien)</h3>
+    <table class="perf-table"><thead><tr><th>QA</th><th>So bug bao cao</th></tr></thead><tbody id="qaStatsBody"></tbody></table>
+  </div>
+  <div class="glass-card">
+    <h3 style="font-size:1rem;">Nang suat Dev (Bug da fix)</h3>
+    <table class="perf-table"><thead><tr><th>Dev</th><th>So bug da fix</th></tr></thead><tbody id="devStatsBody"></tbody></table>
+  </div>
+</div>

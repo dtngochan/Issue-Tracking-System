@@ -1,0 +1,23 @@
+<div class="glass-card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:8px;">
+    <h2 style="font-size:1.1rem;">Danh Sach Loi & Su Co</h2>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <label style="font-size:0.8rem;"><input type="checkbox" id="myIssuesOnly" onchange="loadIssues()"> Chi ticket cua toi</label>
+      <select id="filterProject" class="form-control" style="width:180px;" onchange="loadIssues()"><option value="">-- Du an --</option></select>
+      <select id="filterStatus" class="form-control" style="width:140px;" onchange="loadIssues()">
+        <option value="">-- Trang thai --</option>
+        <option>NEW</option><option>IN_PROGRESS</option><option>RESOLVED</option>
+        <option>CLOSED</option><option>REOPENED</option><option>REJECTED</option><option>DEFERRED</option>
+      </select>
+      <select id="filterSeverity" class="form-control" style="width:130px;" onchange="loadIssues()">
+        <option value="">-- Severity --</option>
+        <option>CRITICAL</option><option>MAJOR</option><option>MINOR</option><option>TRIVIAL</option>
+      </select>
+      <input type="text" id="searchInput" class="form-control" style="width:160px;" placeholder="Tim kiem..." oninput="loadIssues()">
+    </div>
+  </div>
+  <table class="custom-table">
+    <thead><tr><th>Ma</th><th>Tieu de</th><th>Module</th><th>Severity</th><th>Trang thai</th><th>Confidence</th><th>Dev</th><th></th></tr></thead>
+    <tbody id="issuesBody"></tbody>
+  </table>
+</div>

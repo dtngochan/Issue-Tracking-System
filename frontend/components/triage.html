@@ -1,0 +1,47 @@
+<div class="glass-card">
+  <h2 style="font-size:1.1rem;">Bao Cao Loi Moi & Phan Loai Tu Dong (Auto-Triage Engine)</h2>
+  <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:1rem;">Dan Console Log / Stacktrace -> He thong tu dong boc tach tu khoa, goi y Severity, Type va gan Dev phu trach.</p>
+  <form id="createForm" onsubmit="submitIssue(event)">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+      <div class="form-group"><label>Du an *</label><select id="cProjSelect" class="form-control" required onchange="onCreateProjectChange()"></select></div>
+      <div class="form-group"><label>Module *</label><select id="cModSelect" class="form-control" required onchange="triggerTriage()"></select></div>
+    </div>
+    <div class="form-group"><label>Tieu de loi *</label><input type="text" id="cTitle" class="form-control" required placeholder="VD: Loi HTTP 500 khi thanh toan..." oninput="triggerTriage()"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+      <div class="form-group"><label>Mo ta chi tiet</label><textarea id="cDesc" class="form-control" placeholder="Mo ta loi..."></textarea></div>
+      <div class="form-group"><label>Cac buoc tai hien (Steps to reproduce)</label><textarea id="cSteps" class="form-control" placeholder="1. Mo trang...\n2. Bam nut..."></textarea></div>
+    </div>
+    <div class="form-group"><label>Console Log / Stacktrace (Auto-Triage phân tích tại đây) *</label>
+      <textarea id="cLogs" class="form-control" style="min-height:100px;font-family:monospace;font-size:0.82rem;" placeholder="Dan doan log loi..." oninput="triggerTriage()"></textarea>
+    </div>
+    <div class="form-group"><label>Moi truong</label>
+      <select id="cEnv" class="form-control"><option>DEV</option><option>STAGING</option><option>PRODUCTION</option></select>
+    </div>
+    <!-- AUTO-TRIAGE RESULT -->
+    <div id="triageBox" class="triage-result-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <h4 style="color:#a5b4fc;font-size:0.9rem;">Auto-Triage Goi y:</h4>
+          <div id="triageReasons" style="font-size:0.8rem;color:#cbd5e1;margin-top:3px;">Cho du lieu log...</div>
+        </div>
+        <div style="text-align:right;">
+          <span style="font-size:0.7rem;color:var(--text-muted);">Confidence</span>
+          <div class="triage-score" id="triageScore">0%</div>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:1rem;margin-top:1rem;">
+      <div class="form-group"><label>Severity</label>
+        <select id="cSeverity" class="form-control"><option>CRITICAL</option><option selected>MAJOR</option><option>MINOR</option><option>TRIVIAL</option></select>
+      </div>
+      <div class="form-group"><label>Issue Type</label>
+        <select id="cType" class="form-control"><option selected>BUG</option><option>INCIDENT</option><option>ENHANCEMENT</option></select>
+      </div>
+      <div class="form-group"><label>Priority</label>
+        <select id="cPriority" class="form-control"><option>HIGH</option><option selected>MEDIUM</option><option>LOW</option></select>
+      </div>
+      <div class="form-group"><label>Dev Phu trach</label><select id="cAssignee" class="form-control"></select></div>
+    </div>
+    <div style="text-align:right;margin-top:0.5rem;"><button type="submit" class="btn">Luu & Tao Ticket</button></div>
+  </form>
+</div>

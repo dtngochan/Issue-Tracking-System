@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Issue Tracking & Auto-Triage System</title>
+  <meta name="description" content="He thong Quan ly Loi va Phan loai Su co Tu dong">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <div id="loginScreen" style="display:flex; height:100vh; align-items:center; justify-content:center; background:var(--bg-dark);">
+    <div class="glass-card" style="width:100%; max-width:400px; padding:2rem; text-align:center;">
+      <div class="brand-icon" style="margin: 0 auto 1rem; width:50px; height:50px; font-size:24px;">ITS</div>
+      <h2 style="margin-bottom:0.5rem;">Đăng nhập ITS</h2>
+      <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.5rem;">Hệ thống Quản lý Lỗi & Phân loại Sự cố</p>
+      <form onsubmit="handleLogin(event)">
+        <div class="form-group" style="text-align:left;">
+          <label>Email *</label>
+          <input type="email" id="loginEmail" class="form-control" required placeholder="VD: admin@company.com" value="admin@company.com">
+        </div>
+        <button type="submit" class="btn" style="width:100%; margin-top:1rem;">Đăng nhập</button>
+      </form>
+      <div style="margin-top:1rem; font-size:0.8rem; color:var(--text-muted);">
+        Email test: admin@company.com, pm@company.com, qa.lead@company.com, dev.backend@company.com
+      </div>
+    </div>
+  </div>
+
+  <div id="appScreen" style="display:none;">
+    <!-- HEADER -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">ITS</div>
+        <div>
+          <div class="brand-title">ISSUE TRACKING & AUTO-TRIAGE</div>
+          <small style="color:var(--text-muted);font-size:0.7rem;">He thong Quan ly Loi & Phan loai Su co</small>
+        </div>
+      </div>
+      <div class="user-info-container" style="display:flex; align-items:center; gap:10px;">
+        <div style="text-align:right;">
+          <div id="headerUserName" style="font-weight:600; font-size:0.9rem;"></div>
+          <div id="headerUserRole" style="font-size:0.75rem; color:var(--text-muted);"></div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="handleLogout()">Đăng xuất</button>
+      </div>
+    </header>
+
+    <div class="main-container">
+    <!-- TABS -->
+    <div class="nav-tabs" id="mainNavTabs">
+      <button class="tab-btn active" id="tab-dashboard" onclick="switchTab('dashboardTab')">Dashboard</button>
+      <button class="tab-btn" id="tab-issues" onclick="switchTab('issuesTab')">Danh Sach Ticket</button>
+      <button class="tab-btn" id="tab-create" onclick="switchTab('createIssueTab')">Bao Loi & Auto-Triage</button>
+      <button class="tab-btn" id="tab-projects" onclick="switchTab('projectsTab')">Quan Ly Du An</button>
+      <button class="tab-btn" id="tab-admin" onclick="switchTab('adminTab')" style="display:none;">Quan Tri He Thong</button>
+    </div>
+
+    <!-- ====== TAB 1: DASHBOARD ====== -->
+    <section id="dashboardTab" class="tab-content"></section>
+
+    <!-- ====== TAB 2: ISSUE BOARD ====== -->
+    <section id="issuesTab" class="tab-content" style="display:none;"></section>
+
+    <!-- ====== TAB 3: BAO LOI & AUTO-TRIAGE (QA) ====== -->
+    <section id="createIssueTab" class="tab-content" style="display:none;"></section>
+
+    <!-- ====== TAB 4: QUAN LY DU AN (PM/Admin) ====== -->
+    <section id="projectsTab" class="tab-content" style="display:none;"></section>
+
+    <!-- ====== TAB 5: ADMIN HE THONG ====== -->
+    <section id="adminTab" class="tab-content" style="display:none;"></section>
+  </div>
+
+  <!-- ============ MODAL: CHI TIET TICKET ============ -->
+  <div id="issueModal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="close-modal" onclick="closeModal('issueModal')">&times;</button>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div><span class="badge badge-status" id="mKey">-</span><h2 id="mTitle" style="margin-top:4px;font-size:1.15rem;">-</h2></div>
+        <div id="mArchivedBadge" style="display:none;" class="badge badge-critical">READ-ONLY (ARCHIVED)</div>
+      </div>
+      <hr style="border:0;border-top:var(--glass-border);margin:0.75rem 0;">
+      <div style="display:grid;grid-template-columns:5fr 3fr;gap:1.25rem;">
+        <!-- LEFT -->
+        <div>
+          <h4 style="font-size:0.9rem;">Mo ta:</h4>
+          <p id="mDesc" style="white-space:pre-line;color:#cbd5e1;font-size:0.85rem;margin-bottom:0.75rem;"></p>
+          <h4 style="font-size:0.9rem;">Cac buoc tai hien:</h4>
+          <p id="mSteps" style="white-space:pre-line;color:#cbd5e1;font-size:0.85rem;margin-bottom:0.75rem;"></p>
+          <h4 style="font-size:0.9rem;">Log he thong:</h4>
+          <pre id="mLogs" style="background:rgba(0,0,0,0.5);padding:8px;border-radius:6px;color:#38bdf8;font-size:0.75rem;overflow-x:auto;max-height:120px;"></pre>
+
+          <!-- TRIAGE CONTROLS (PM/Dev) -->
+          <div id="triageControls" style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);padding:10px;border-radius:8px;margin-top:0.75rem;">
+            <h4 style="font-size:0.85rem;">Dieu phoi & Gan lai (Triage):</h4>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px;">
+              <div><label style="font-size:0.75rem;">Gan Dev:</label><select id="mReassign" class="form-control" style="padding:4px;font-size:0.82rem;"></select></div>
+              <div><label style="font-size:0.75rem;">Priority:</label><select id="mPriority" class="form-control" style="padding:4px;font-size:0.82rem;"><option>HIGH</option><option>MEDIUM</option><option>LOW</option></select></div>
+              <div><label style="font-size:0.75rem;">Severity:</label><select id="mSeverity" class="form-control" style="padding:4px;font-size:0.82rem;"><option>CRITICAL</option><option>MAJOR</option><option>MINOR</option><option>TRIVIAL</option></select></div>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="margin-top:6px;width:100%;" onclick="saveTriage()">Luu Thay Doi</button>
+          </div>
+
+          <!-- COMMENTS -->
+          <h4 style="margin-top:0.75rem;font-size:0.9rem;">Binh luan & Trao doi:</h4>
+          <div id="mComments" style="max-height:160px;overflow-y:auto;margin:6px 0;font-size:0.82rem;"></div>
+          <div id="mCommentForm" style="display:flex;gap:6px;">
+            <input type="text" id="mCommentInput" class="form-control" placeholder="Viet binh luan...">
+            <button class="btn btn-secondary btn-sm" onclick="postComment()">Gui</button>
+          </div>
+
+          <!-- AUDIT LOG / HISTORY -->
+          <h4 style="margin-top:0.75rem;font-size:0.9rem;">Lich su thay doi (Audit Log):</h4>
+          <div id="mHistory" style="max-height:140px;overflow-y:auto;margin-top:4px;"></div>
+        </div>
+        <!-- RIGHT -->
+        <div style="background:rgba(255,255,255,0.03);padding:0.75rem;border-radius:10px;">
+          <h4 style="font-size:0.88rem;">Thong tin quan tri</h4>
+          <div style="margin-top:8px;font-size:0.82rem;line-height:1.9;">
+            <div><strong>Trang thai:</strong> <span id="mStatus">-</span></div>
+            <div><strong>Severity:</strong> <span id="mSev">-</span></div>
+            <div><strong>Priority:</strong> <span id="mPri">-</span></div>
+            <div><strong>Type:</strong> <span id="mType">-</span></div>
+            <div><strong>Moi truong:</strong> <span id="mEnv">-</span></div>
+            <div><strong>Reporter:</strong> <span id="mReporter">-</span></div>
+            <div><strong>Dev:</strong> <span id="mAssignee">-</span></div>
+            <div><strong>Git Ref:</strong> <span id="mGit" style="color:#38bdf8;">-</span></div>
+            <div><strong>SLA:</strong> <span id="mSLA" style="color:#f59e0b;">-</span></div>
+            <div><strong>Confidence:</strong> <span id="mConf" style="color:#818cf8;">-</span></div>
+          </div>
+
+          <h4 style="margin-top:1rem;font-size:0.88rem;">Chuyen trang thai Workflow:</h4>
+          <div id="workflowBtns" style="display:flex;flex-direction:column;gap:6px;margin-top:6px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TAO USER -->
+  <div id="createUserModal" class="modal-overlay">
+    <div class="modal-content" style="max-width:460px;">
+      <button class="close-modal" onclick="closeModal('createUserModal')">&times;</button>
+      <h3 style="font-size:1rem;">Them Tai Khoan Moi</h3>
+      <form onsubmit="createUser(event)" style="margin-top:0.75rem;">
+        <div class="form-group"><label>Ho Ten *</label><input type="text" id="nuName" class="form-control" required></div>
+        <div class="form-group"><label>Email *</label><input type="email" id="nuEmail" class="form-control" required></div>
+        <div class="form-group"><label>Global Role</label><select id="nuRole" class="form-control"><option value="USER">USER</option><option value="ADMIN">ADMIN</option></select></div>
+        <button type="submit" class="btn" style="width:100%;">Tao Tai Khoan</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: TAO DU AN -->
+  <div id="createProjectModal" class="modal-overlay">
+    <div class="modal-content" style="max-width:500px;">
+      <button class="close-modal" onclick="closeModal('createProjectModal')">&times;</button>
+      <h3 style="font-size:1rem;">Tao Du An Moi</h3>
+      <form onsubmit="createProject(event)" style="margin-top:0.75rem;">
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:0.75rem;">
+          <div class="form-group"><label>Ma du an (Key) *</label><input type="text" id="npKey" class="form-control" required placeholder="VD: ECOM" maxlength="10"></div>
+          <div class="form-group"><label>Ten du an *</label><input type="text" id="npName" class="form-control" required></div>
+        </div>
+        <div class="form-group"><label>Mo ta</label><textarea id="npDesc" class="form-control"></textarea></div>
+        <div class="form-group"><label>Gan PM</label><select id="npPM" class="form-control"></select></div>
+        <button type="submit" class="btn" style="width:100%;">Tao Du An</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: THEM THANH VIEN -->
+  <div id="addMemberModal" class="modal-overlay">
+    <div class="modal-content" style="max-width:460px;">
+      <button class="close-modal" onclick="closeModal('addMemberModal')">&times;</button>
+      <h3 style="font-size:1rem;">Them Thanh Vien Vao Du An</h3>
+      <input type="hidden" id="amProjId">
+      <form onsubmit="addMember(event)" style="margin-top:0.75rem;">
+        <div class="form-group"><label>Chon nguoi dung</label><select id="amUser" class="form-control"></select></div>
+        <div class="form-group"><label>Vai tro trong du an</label><select id="amRole" class="form-control"><option>PM</option><option selected>DEV</option><option>QA</option></select></div>
+        <button type="submit" class="btn" style="width:100%;">Them Thanh Vien</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: TAO MODULE -->
+  <div id="createModuleModal" class="modal-overlay">
+    <div class="modal-content" style="max-width:460px;">
+      <button class="close-modal" onclick="closeModal('createModuleModal')">&times;</button>
+      <h3 style="font-size:1rem;">Them Module Cho Du An</h3>
+      <input type="hidden" id="cmProjId">
+      <form onsubmit="createModule(event)" style="margin-top:0.75rem;">
+        <div class="form-group"><label>Ten Module *</label><input type="text" id="cmName" class="form-control" required></div>
+        <div class="form-group"><label>Mo ta</label><input type="text" id="cmDesc" class="form-control"></div>
+        <div class="form-group"><label>Dev Mac Dinh (Default Assignee)</label><select id="cmDev" class="form-control"></select></div>
+        <button type="submit" class="btn" style="width:100%;">Luu Module</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CHI TIET DU AN -->
+  <div id="projectDetailModal" class="modal-overlay">
+    <div class="modal-content" style="max-width:700px;">
+      <button class="close-modal" onclick="closeModal('projectDetailModal')">&times;</button>
+      <h3 id="pdTitle" style="font-size:1rem;">-</h3>
+      <hr style="border:0;border-top:var(--glass-border);margin:0.5rem 0;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div>
+          <h4 style="font-size:0.88rem;">Thanh vien du an:</h4>
+          <div id="pdMembers" style="margin-top:4px;font-size:0.82rem;"></div>
+        </div>
+        <div>
+          <h4 style="font-size:0.88rem;">Modules & Default Assignee:</h4>
+          <div id="pdModules" style="margin-top:4px;font-size:0.82rem;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+  </div>
+  <script src="js/app.js"></script>
+</body>
+</html>
