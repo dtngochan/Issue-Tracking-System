@@ -8,19 +8,22 @@ dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api/dashboard')
 @dashboard_bp.route('/summary', methods=['GET'])
 def get_summary():
     project_id = request.args.get('project_id', type=int)
+    user_id = request.args.get('user_id', type=int)
 
-    query = Issue.query
-    if project_id:
-        query = query.filter_by(project_id=project_id)
-
-    total_bugs = query.count()
-    new_bugs = query.filter(Issue.status == 'NEW').count() if not project_id else query.filter_by(status='NEW').count()
-    
-    # Reset query for each filter
     base = Issue.query
+
+    # RBAC: Filter by user's projects if not admin
+    if user_id:
+        user = User.query.get(user_id)
+        if user and user.global_role != 'ADMIN':
+            member_projects = db.session.query(ProjectMember.project_id).filter_by(user_id=user_id).subquery()
+            base = base.filter(Issue.project_id.in_(member_projects))
+
     if project_id:
         base = base.filter_by(project_id=project_id)
-    
+
+    total_bugs = base.count()
+    new_bugs = base.filter(Issue.status == 'NEW').count()
     in_progress_bugs = base.filter(Issue.status == 'IN_PROGRESS').count()
     resolved_bugs = base.filter(Issue.status == 'RESOLVED').count()
     closed_bugs = base.filter(Issue.status == 'CLOSED').count()
@@ -34,7 +37,7 @@ def get_summary():
     reopen_rate = round((reopened_bugs / total_resolved_closed * 100), 1) if total_resolved_closed > 0 else 0.0
 
     # Tính MTTR thực tế (Mean Time To Resolve)
-    mttr_hours = calculate_mttr(project_id)
+    mttr_hours = calculate_mttr(project_id, user_id)
 
     # Thống kê theo Severity
     severity_breakdown = {
@@ -78,9 +81,16 @@ def get_summary():
     }), 200
 
 
-def calculate_mttr(project_id=None):
+def calculate_mttr(project_id=None, user_id=None):
     """Tính MTTR thực tế dựa trên thời gian tạo và thời gian resolve/close"""
     query = Issue.query.filter(Issue.status.in_(['RESOLVED', 'CLOSED']))
+    
+    if user_id:
+        user = User.query.get(user_id)
+        if user and user.global_role != 'ADMIN':
+            member_projects = db.session.query(ProjectMember.project_id).filter_by(user_id=user_id).subquery()
+            query = query.filter(Issue.project_id.in_(member_projects))
+
     if project_id:
         query = query.filter_by(project_id=project_id)
     

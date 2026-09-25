@@ -25,8 +25,17 @@ def get_issues():
     assignee_id = request.args.get('assignee_id', type=int)
     reporter_id = request.args.get('reporter_id', type=int)
     search = request.args.get('search', '').strip()
+    user_id = request.args.get('user_id', type=int)
 
     query = Issue.query
+
+    # RBAC: Filter by user's projects if not admin
+    if user_id:
+        user = User.query.get(user_id)
+        if user and user.global_role != 'ADMIN':
+            from models import ProjectMember
+            member_projects = db.session.query(ProjectMember.project_id).filter_by(user_id=user_id).subquery()
+            query = query.filter(Issue.project_id.in_(member_projects))
 
     if project_id:
         query = query.filter_by(project_id=project_id)

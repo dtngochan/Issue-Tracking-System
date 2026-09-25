@@ -131,7 +131,10 @@ function closeModal(id) { document.getElementById(id).classList.remove('active')
 // ====== 1. DASHBOARD ======
 async function loadDashboard() {
   try {
-    const r = await fetch(`${API}/dashboard/summary`);
+    let url = `${API}/dashboard/summary?user_id=${currentUser.user_id}`;
+    const pid = document.getElementById('filterDashboardProject')?.value;
+    if (pid) url += `&project_id=${pid}`;
+    const r = await fetch(url);
     const d = await r.json();
     document.getElementById('statTotal').textContent = d.total_issues;
     document.getElementById('statCritical').textContent = d.critical_issues;
@@ -141,6 +144,18 @@ async function loadDashboard() {
     document.getElementById('statClosed').textContent = d.closed_issues;
     renderCharts(d.severity_breakdown, d.status_breakdown);
     renderPerfStats(d.qa_stats, d.dev_stats);
+    
+    // Populate dropdowns if not populated yet
+    const fdp = document.getElementById('filterDashboardProject');
+    if (fdp && fdp.options.length <= 1) {
+      const pUrl = currentUser.role === 'ADMIN' ? `${API}/projects` : `${API}/projects?user_id=${currentUser.user_id}`;
+      const pRes = await fetch(pUrl);
+      const myProjects = await pRes.json();
+      fdp.innerHTML = '<option value="">-- Tat ca Du an --</option>' + myProjects.map(p => `<option value="${p.project_id}">${p.project_name}</option>`).join('');
+      
+      const fp = document.getElementById('filterProject');
+      if (fp) fp.innerHTML = '<option value="">-- Tat ca Du an --</option>' + myProjects.map(p => `<option value="${p.project_id}">${p.project_name}</option>`).join('');
+    }
   } catch (e) { console.error(e); }
 }
 
@@ -173,14 +188,18 @@ async function loadProjects() {
     projects = await r.json();
     // Update filter selects
     const fp = document.getElementById('filterProject');
-    const cp = document.getElementById('cProjSelect');
-    fp.innerHTML = '<option value="">-- Du an --</option>';
-    cp.innerHTML = '';
-    projects.forEach(p => {
-      fp.innerHTML += `<option value="${p.project_id}">${p.project_key} - ${p.project_name}</option>`;
-      cp.innerHTML += `<option value="${p.project_id}">${p.project_key} - ${p.project_name} ${p.status==='ARCHIVED'?'[Read-Only]':''}</option>`;
-    });
+    if(fp) {
+      fp.innerHTML = '<option value="">-- Tat ca Du an --</option>';
+      projects.forEach(p => fp.innerHTML += `<option value="${p.project_id}">${p.project_key} - ${p.project_name}</option>`);
+    }
+    
     renderProjectsGrid();
+
+    const btnCreateProj = document.getElementById('btnCreateProject');
+    if (btnCreateProj) {
+      btnCreateProj.style.display = currentUser.role === 'ADMIN' ? 'inline-block' : 'none';
+    }
+
     // Populate PM select in create project modal
     const users = await (await fetch(`${API}/auth/users`)).json();
     const pmSel = document.getElementById('npPM');
@@ -292,7 +311,7 @@ async function deleteModule(pid, mid) {
 // ====== 3. ISSUES ======
 async function loadIssues() {
   try {
-    let url = `${API}/issues?`;
+    let url = `${API}/issues?user_id=${currentUser.user_id}&`;
     const pid = document.getElementById('filterProject').value;
     const st = document.getElementById('filterStatus').value;
     const sv = document.getElementById('filterSeverity').value;

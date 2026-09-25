@@ -57,3 +57,8 @@
 ### 🔹 GIAI ĐOẠN 6: KIỂM THỬ THỰC TẾ & BẢO TRÌ (TESTING & VERIFICATION)
 - [ ] Chạy Backend Flask trên cổng local `http://127.0.0.1:5000`.
 - [ ] Khởi chạy Web Application và thực nghiệm toàn bộ vòng đời Bug từ A-Z.
+
+1. Về dashboard: có filter lọc theo dự án, khi chọn vào dự án nào thì chỉ xem được báo cáo thống kê của dự án đó. Chỉ có admin là được xem thống kê của toàn bộ các dự án, còn các user khác chỉ có thể xem thống kê của dự án mình đang đảm nhận.
+2. Danh sách ticket: cũng sẽ hiển thị theo dự án được phân công. Tôi thấy ở phần admin và pm bạn đã làm đúng, có phần lọc dữ liệu theo dự án. Nhưng ở dev và tester nó show tất cả ticket có mà không lọc theo dự án, tôi thấy email "qa.tester@company.com" không được phân công cho dự án "He thong ban hang truc tuyen tich hop VNPAY, MoMo" mà vẫn xem được các ticket. Cần phải sửa lại 
+3. Báo lỗi & Auto Triage: Chỉ có QA, tester đảm nhận chức năng ghi lỗi này thôi. Và toi thấy có 1 điểm ở đây là khi ta nhận thông tin ở trường "Tieu de loi" là nó đã tự động Auto Triage. chưa cần nhập tới trường console. Và tôi không thấy có trường nào cho phép upload ảnh hoặc video để phân tích. Và toi muốn hỏi cách đánh giá % confidence của bạn là như nào? Có đảm bảo tính minh bạch và chính xác không 
+4. Quản lý dự án: Admin chỉ có thể tạo mới dự án và gán PM, còn PM sẽ thêm từng thành viên vào nhóm sau đó gán nhiệm vụ cho từng thành viên theo module. Vậy ở UI của PM nên xóa button tạo mới dự án 
