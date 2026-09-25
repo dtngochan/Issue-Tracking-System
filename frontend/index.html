@@ -534,7 +534,7 @@
                     <label class="form-label small fw-semibold">Gán Dev</label>
                     <select class="form-select form-select-sm" v-model="createForm.assignee_id">
                       <option value="">-- Tự động --</option>
-                      <option v-for="m in currentProjectMembers" :key="m.user_id" :value="m.user_id">
+                      <option v-for="m in currentProjectMembers.filter(m => m.project_role === 'DEV')" :key="m.user_id" :value="m.user_id">
                         {{ m.user ? m.user.full_name : 'N/A' }} ({{ m.project_role }})
                       </option>
                     </select>
@@ -850,7 +850,7 @@
                 <div v-else class="d-grid gap-2">
                   <!-- NEW / REOPENED -->
                   <template v-if="activeIssue.status === 'NEW' || activeIssue.status === 'REOPENED'">
-                    <button class="btn btn-warning btn-sm fw-semibold" @click="handleChangeStatus('IN_PROGRESS')">
+                    <button class="btn btn-warning btn-sm fw-semibold" v-if="currentUser.role === 'DEV'" @click="handleChangeStatus('IN_PROGRESS')">
                       <i class="bi bi-play-circle me-1"></i> Bắt đầu sửa (IN_PROGRESS)
                     </button>
                     <button class="btn btn-outline-danger btn-sm" v-if="currentUser.role === 'PM' || currentUser.role === 'ADMIN'" @click="handleChangeStatus('REJECTED')">
@@ -866,7 +866,7 @@
 
                   <!-- IN_PROGRESS -->
                   <template v-else-if="activeIssue.status === 'IN_PROGRESS'">
-                    <button class="btn btn-success btn-sm fw-semibold" @click="handleChangeStatus('RESOLVED')">
+                    <button class="btn btn-success btn-sm fw-semibold" v-if="currentUser.role === 'DEV'" @click="handleChangeStatus('RESOLVED')">
                       <i class="bi bi-check2-circle me-1"></i> Đã fix code (RESOLVED)
                     </button>
                   </template>
@@ -1061,7 +1061,9 @@
               <label class="form-label small fw-semibold">Dev Mặc Định</label>
               <select class="form-select form-select-sm" v-model="newModule.default_assignee_id">
                 <option value="">-- Chưa gán --</option>
-                <option v-for="u in allUsers" :key="u.user_id" :value="u.user_id">{{ u.full_name }}</option>
+                <option v-for="m in (activeProjectDetail?.members || []).filter(m => m.project_role === 'DEV')" :key="m.user_id" :value="m.user_id">
+                  {{ m.user ? m.user.full_name : 'N/A' }}
+                </option>
               </select>
             </div>
           </div>

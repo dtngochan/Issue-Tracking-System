@@ -188,6 +188,41 @@ def update_status(issue_id):
     if old_status == new_status:
         return jsonify({'message': 'Trạng thái không thay đổi', 'issue': issue.to_dict()}), 200
 
+    # 1. Get User and Project Role
+    from models import User, ProjectMember
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'Người dùng không tồn tại'}), 401
+    
+    project_role = 'ADMIN'
+    if user.global_role != 'ADMIN':
+        membership = ProjectMember.query.filter_by(project_id=issue.project_id, user_id=user_id).first()
+        if not membership:
+            return jsonify({'error': 'Bạn không có quyền thao tác trên dự án này'}), 403
+        project_role = membership.project_role
+
+    # 2. State Machine Validation (Quy tắc luồng)
+    valid_transitions = {
+        'NEW': ['IN_PROGRESS', 'DEFERRED', 'REJECTED', 'RESOLVED'],
+        'IN_PROGRESS': ['RESOLVED', 'DEFERRED', 'REJECTED'],
+        'RESOLVED': ['CLOSED', 'REOPENED'],
+        'REOPENED': ['IN_PROGRESS', 'RESOLVED', 'DEFERRED', 'REJECTED'],
+        'DEFERRED': ['NEW', 'IN_PROGRESS', 'CLOSED'],
+        'REJECTED': ['CLOSED', 'REOPENED'],
+        'CLOSED': ['REOPENED']
+    }
+    if new_status not in valid_transitions.get(old_status, []):
+        return jsonify({'error': f'Lỗi State Machine: Không thể chuyển từ {old_status} sang {new_status}'}), 400
+
+    # 3. RBAC Validation (Phân quyền)
+    if project_role == 'DEV':
+        # Dev chỉ được phép làm việc trên ticket của mình
+        if issue.assignee_id != user_id:
+            return jsonify({'error': 'Từ chối: Ticket này không được giao cho bạn!'}), 403
+        # Dev chỉ được chuyển trạng thái sang Đang xử lý hoặc Đã sửa xong
+        if new_status not in ['IN_PROGRESS', 'RESOLVED']:
+            return jsonify({'error': 'Từ chối: DEV chỉ được chuyển sang IN_PROGRESS hoặc RESOLVED. Chỉ QA/PM mới được CLOSED.'}), 403
+
     issue.status = new_status
     if git_ref:
         issue.git_commit_ref = git_ref

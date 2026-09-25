@@ -343,6 +343,10 @@ createApp({
 
     async function handleCreateProject() {
       if (!newProject.project_key || !newProject.project_name) return;
+      if (!newProject.pm_id) {
+        showToast('Vui lòng gán PM phụ trách trước khi tạo dự án!', 'warning');
+        return;
+      }
       try {
         const res = await fetch(`${API}/projects`, {
           method: 'POST',
