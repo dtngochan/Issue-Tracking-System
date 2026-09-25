@@ -1,5 +1,4 @@
 from flask import Blueprint, request, jsonify
-from sqlalchemy import func
 from datetime import datetime
 from models import Issue, Project, User, IssueHistory, ProjectMember, db
 

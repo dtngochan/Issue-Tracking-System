@@ -47,12 +47,12 @@ createApp({
     const activeIssue = ref(null);
     const activeProjectDetail = ref(null);
 
-    // Filters for Issues
+    // Filters for Issues & Dashboard
+    const dashboardFilterProject = ref('');
     const filterProject = ref('');
     const filterStatus = ref('');
     const filterSeverity = ref('');
     const searchQuery = ref('');
-    const myIssuesOnly = ref(false);
 
     // Auto-Triage / Create Issue Form
     const createForm = reactive({
@@ -69,7 +69,7 @@ createApp({
       assignee_id: ''
     });
 
-<<<<<<< HEAD
+
     const currentProjectModules = ref([]);
     const currentProjectMembers = ref([]);
     const triageResult = reactive({
@@ -81,171 +81,6 @@ createApp({
       reasons: []
     });
     let triageTimer = null;
-=======
-function handleLogout() {
-  localStorage.removeItem('its_user');
-  currentUser = null;
-  showLoginScreen();
-}
-
-function showLoginScreen() {
-  document.getElementById('loginScreen').style.display = 'flex';
-  document.getElementById('appScreen').style.display = 'none';
-}
-
-function showAppScreen() {
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('appScreen').style.display = 'block';
-  
-  // Set header info
-  document.getElementById('headerUserName').textContent = currentUser.full_name;
-  document.getElementById('headerUserRole').textContent = `Vai trò: ${currentUser.role}`;
-  
-  // Setup tabs visibility based on role (RBAC)
-  setupRBACTabs();
-  
-  // Default tab
-  switchTab('dashboardTab');
-}
-
-function setupRBACTabs() {
-  const role = currentUser.role;
-  const tabCreate = document.getElementById('tab-create');
-  const tabProjects = document.getElementById('tab-projects');
-  const tabAdmin = document.getElementById('tab-admin');
-  
-  // Reset visibility
-  tabCreate.style.display = 'inline-flex';
-  tabProjects.style.display = 'inline-flex';
-  tabAdmin.style.display = 'none';
-  
-  if (role === 'DEV') {
-    tabCreate.style.display = 'none';
-    tabProjects.style.display = 'none';
-  } else if (role === 'QA') {
-    tabProjects.style.display = 'none';
-  } else if (role === 'ADMIN') {
-    tabAdmin.style.display = 'inline-flex';
-  }
-}
-
-const componentCache = {};
-
-async function switchTab(id) {
-  document.querySelectorAll('.tab-content').forEach(e => e.style.display = 'none');
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  
-  const section = document.getElementById(id);
-  section.style.display = 'block';
-  if(event && event.currentTarget) event.currentTarget.classList.add('active');
-  
-  let compName = '';
-  if (id === 'dashboardTab') compName = 'dashboard';
-  if (id === 'issuesTab') compName = 'issues';
-  if (id === 'createIssueTab') compName = 'triage';
-  if (id === 'projectsTab') compName = 'projects';
-  if (id === 'adminTab') compName = 'admin';
-
-  if (!componentCache[compName]) {
-    try {
-      const r = await fetch(`components/${compName}.html`);
-      const html = await r.text();
-      section.innerHTML = html;
-      componentCache[compName] = true;
-    } catch(e) { console.error('Loi tai component:', e); }
-  }
-
-  // Reload data
-  if (id === 'dashboardTab') setTimeout(loadDashboard, 100);
-  if (id === 'issuesTab') setTimeout(loadIssues, 100);
-  if (id === 'createIssueTab') setTimeout(prepareCreateForm, 100);
-  if (id === 'projectsTab') setTimeout(loadProjects, 100);
-  if (id === 'adminTab') setTimeout(loadUsers, 100);
-}
-
-function showModal(id) { document.getElementById(id).classList.add('active'); }
-function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-
-// ====== 1. DASHBOARD ======
-async function loadDashboard() {
-  try {
-    let url = `${API}/dashboard/summary?user_id=${currentUser.user_id}`;
-    const pid = document.getElementById('filterDashboardProject')?.value;
-    if (pid) url += `&project_id=${pid}`;
-    const r = await fetch(url);
-    const d = await r.json();
-    document.getElementById('statTotal').textContent = d.total_issues;
-    document.getElementById('statCritical').textContent = d.critical_issues;
-    document.getElementById('statReopen').textContent = d.reopen_rate_percent + '%';
-    document.getElementById('statMTTR').textContent = d.mttr_hours_avg + 'h';
-    document.getElementById('statInProgress').textContent = d.in_progress_issues;
-    document.getElementById('statClosed').textContent = d.closed_issues;
-    renderCharts(d.severity_breakdown, d.status_breakdown);
-    renderPerfStats(d.qa_stats, d.dev_stats);
-    
-    // Populate dropdowns if not populated yet
-    const fdp = document.getElementById('filterDashboardProject');
-    if (fdp && fdp.options.length <= 1) {
-      const pUrl = currentUser.role === 'ADMIN' ? `${API}/projects` : `${API}/projects?user_id=${currentUser.user_id}`;
-      const pRes = await fetch(pUrl);
-      const myProjects = await pRes.json();
-      fdp.innerHTML = '<option value="">-- Tat ca Du an --</option>' + myProjects.map(p => `<option value="${p.project_id}">${p.project_name}</option>`).join('');
-      
-      const fp = document.getElementById('filterProject');
-      if (fp) fp.innerHTML = '<option value="">-- Tat ca Du an --</option>' + myProjects.map(p => `<option value="${p.project_id}">${p.project_name}</option>`).join('');
-    }
-  } catch (e) { console.error(e); }
-}
-
-function renderCharts(sev, stat) {
-  if (sevChart) sevChart.destroy();
-  if (statChart) statChart.destroy();
-  sevChart = new Chart(document.getElementById('severityChart').getContext('2d'), {
-    type: 'doughnut',
-    data: { labels: ['Critical','Major','Minor','Trivial'], datasets: [{ data: [sev.CRITICAL,sev.MAJOR,sev.MINOR,sev.TRIVIAL], backgroundColor: ['#ef4444','#f59e0b','#06b6d4','#94a3b8'] }] },
-    options: { responsive: true, plugins: { legend: { labels: { color: '#fff', font: { size: 11 } } } } }
-  });
-  statChart = new Chart(document.getElementById('statusChart').getContext('2d'), {
-    type: 'bar',
-    data: { labels: ['New','In Progress','Resolved','Closed','Reopened','Rejected','Deferred'], datasets: [{ label: 'Bugs', data: [stat.NEW,stat.IN_PROGRESS,stat.RESOLVED,stat.CLOSED,stat.REOPENED,stat.REJECTED||0,stat.DEFERRED||0], backgroundColor: ['#3b82f6','#f59e0b','#8b5cf6','#10b981','#ef4444','#6b7280','#4b5563'] }] },
-    options: { responsive: true, scales: { x: { ticks: { color: '#fff', font: { size: 10 } } }, y: { ticks: { color: '#fff' }, beginAtZero: true } }, plugins: { legend: { display: false } } }
-  });
-}
-
-function renderPerfStats(qa, dev) {
-  const qb = document.getElementById('qaStatsBody');
-  const db2 = document.getElementById('devStatsBody');
-  qb.innerHTML = qa.length ? qa.map(q => `<tr><td>${q.full_name}</td><td><strong>${q.count}</strong></td></tr>`).join('') : '<tr><td colspan="2" style="color:var(--text-muted)">Chua co du lieu</td></tr>';
-  db2.innerHTML = dev.length ? dev.map(d => `<tr><td>${d.full_name}</td><td><strong>${d.count}</strong></td></tr>`).join('') : '<tr><td colspan="2" style="color:var(--text-muted)">Chua co du lieu</td></tr>';
-}
-
-// ====== 2. PROJECTS ======
-async function loadProjects() {
-  try {
-    const r = await fetch(`${API}/projects`);
-    projects = await r.json();
-    // Update filter selects
-    const fp = document.getElementById('filterProject');
-    if(fp) {
-      fp.innerHTML = '<option value="">-- Tat ca Du an --</option>';
-      projects.forEach(p => fp.innerHTML += `<option value="${p.project_id}">${p.project_key} - ${p.project_name}</option>`);
-    }
-    
-    renderProjectsGrid();
-
-    const btnCreateProj = document.getElementById('btnCreateProject');
-    if (btnCreateProj) {
-      btnCreateProj.style.display = currentUser.role === 'ADMIN' ? 'inline-block' : 'none';
-    }
-
-    // Populate PM select in create project modal
-    const users = await (await fetch(`${API}/auth/users`)).json();
-    const pmSel = document.getElementById('npPM');
-    pmSel.innerHTML = '<option value="">-- Chon PM --</option>';
-    users.forEach(u => pmSel.innerHTML += `<option value="${u.user_id}">${u.full_name} (${u.email})</option>`);
-  } catch (e) { console.error(e); }
-}
->>>>>>> bbd2b81b6cb46ac570f6e547ca8e262dcd95eaa8
 
     // Project Create Form Modal
     const newProject = reactive({ project_key: '', project_name: '', description: '', pm_id: '' });
@@ -270,7 +105,6 @@ async function loadProjects() {
       }
     });
 
-<<<<<<< HEAD
     function toggleTheme() {
       theme.value = theme.value === 'dark' ? 'light' : 'dark';
       localStorage.setItem('its_theme', theme.value);
@@ -278,105 +112,6 @@ async function loadProjects() {
       if (activeTab.value === 'dashboard') {
         nextTick(renderCharts);
       }
-=======
-async function showAddMemberModal(pid) {
-  document.getElementById('amProjId').value = pid;
-  const users = await (await fetch(`${API}/auth/users`)).json();
-  const s = document.getElementById('amUser');
-  s.innerHTML = users.map(u => `<option value="${u.user_id}">${u.full_name} (${u.email})</option>`).join('');
-  showModal('addMemberModal');
-}
-
-async function addMember(e) {
-  e.preventDefault();
-  const pid = document.getElementById('amProjId').value;
-  const r = await fetch(`${API}/projects/${pid}/members`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ user_id: document.getElementById('amUser').value, project_role: document.getElementById('amRole').value }) });
-  const d = await r.json();
-  alert(d.message || d.error);
-  closeModal('addMemberModal');
-  loadProjects();
-}
-
-async function removeMember(pid, uid) {
-  if (!confirm('Xoa thanh vien nay khoi du an?')) return;
-  await fetch(`${API}/projects/${pid}/members/${uid}`, { method: 'DELETE' });
-  viewProjectDetail(pid);
-  loadProjects();
-}
-
-async function showAddModuleModal(pid) {
-  document.getElementById('cmProjId').value = pid;
-  const users = await (await fetch(`${API}/auth/users`)).json();
-  const s = document.getElementById('cmDev');
-  s.innerHTML = '<option value="">-- Chua gan --</option>' + users.map(u => `<option value="${u.user_id}">${u.full_name}</option>`).join('');
-  showModal('createModuleModal');
-}
-
-async function createModule(e) {
-  e.preventDefault();
-  const pid = document.getElementById('cmProjId').value;
-  const r = await fetch(`${API}/projects/${pid}/modules`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ module_name: document.getElementById('cmName').value, description: document.getElementById('cmDesc').value, default_assignee_id: document.getElementById('cmDev').value || null }) });
-  if (r.ok) { alert('Tao Module thanh cong!'); closeModal('createModuleModal'); loadProjects(); } else { const d = await r.json(); alert(d.error); }
-}
-
-async function deleteModule(pid, mid) {
-  if (!confirm('Xoa module nay?')) return;
-  await fetch(`${API}/projects/${pid}/modules/${mid}`, { method: 'DELETE' });
-  viewProjectDetail(pid);
-  loadProjects();
-}
-
-// ====== 3. ISSUES ======
-async function loadIssues() {
-  try {
-    let url = `${API}/issues?user_id=${currentUser.user_id}&`;
-    const pid = document.getElementById('filterProject').value;
-    const st = document.getElementById('filterStatus').value;
-    const sv = document.getElementById('filterSeverity').value;
-    const srch = document.getElementById('searchInput').value;
-    const my = document.getElementById('myIssuesOnly').checked;
-    if (pid) url += `project_id=${pid}&`;
-    if (st) url += `status=${st}&`;
-    if (sv) url += `severity=${sv}&`;
-    if (srch) url += `search=${encodeURIComponent(srch)}&`;
-    if (my) url += `assignee_id=${currentUser.user_id}&`;
-    const r = await fetch(url);
-    issues = await r.json();
-    renderIssuesTable();
-  } catch (e) { console.error(e); }
-}
-
-function renderIssuesTable() {
-  const tb = document.getElementById('issuesBody');
-  if (!issues.length) { tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted)">Khong co ticket</td></tr>'; return; }
-  tb.innerHTML = issues.map(i => {
-    const sc = `badge-${i.severity.toLowerCase()}`;
-    const stc = `badge-${i.status.toLowerCase()}`;
-    return `<tr onclick="openIssue(${i.issue_id})">
-      <td><strong>${i.issue_key}</strong></td>
-      <td>${i.title}</td>
-      <td>${i.module_name||'-'}</td>
-      <td><span class="badge ${sc}">${i.severity}</span></td>
-      <td><span class="badge ${stc}">${i.status}</span></td>
-      <td style="color:#818cf8;font-weight:700;">${i.confidence_score}%</td>
-      <td>${i.assignee_name||'N/A'}</td>
-      <td><button class="btn btn-secondary btn-sm">Xem</button></td>
-    </tr>`;
-  }).join('');
-}
-
-// ====== 4. AUTO-TRIAGE & CREATE ISSUE ======
-let triageTimer = null;
-
-async function prepareCreateForm() {
-  try {
-    const url = currentUser.role === 'ADMIN' ? `${API}/projects` : `${API}/projects?user_id=${currentUser.user_id}`;
-    const r = await fetch(url);
-    const myProjects = await r.json();
-    const cp = document.getElementById('cProjSelect');
-    if(cp) {
-      cp.innerHTML = '<option value="">-- Chon Du an --</option>' + myProjects.map(p => `<option value="${p.project_id}">${p.project_key} - ${p.project_name} ${p.status==='ARCHIVED'?'[Read-Only]':''}</option>`).join('');
->>>>>>> bbd2b81b6cb46ac570f6e547ca8e262dcd95eaa8
     }
 
     function applyTheme(t) {
@@ -509,7 +244,10 @@ async function prepareCreateForm() {
     // ----------------- DASHBOARD -----------------
     async function loadDashboard() {
       try {
-        const res = await fetch(`${API}/dashboard/summary`);
+        let url = `${API}/dashboard/summary?`;
+        if (currentUser.value) url += `user_id=${currentUser.value.user_id}&`;
+        if (dashboardFilterProject.value) url += `project_id=${dashboardFilterProject.value}&`;
+        const res = await fetch(url);
         dashboardData.value = await res.json();
         nextTick(renderCharts);
       } catch (e) {
@@ -739,11 +477,11 @@ async function prepareCreateForm() {
     async function loadIssues() {
       try {
         let url = `${API}/issues?`;
+        if (currentUser.value) url += `user_id=${currentUser.value.user_id}&`;
         if (filterProject.value) url += `project_id=${filterProject.value}&`;
         if (filterStatus.value) url += `status=${filterStatus.value}&`;
         if (filterSeverity.value) url += `severity=${filterSeverity.value}&`;
         if (searchQuery.value) url += `search=${encodeURIComponent(searchQuery.value)}&`;
-        if (myIssuesOnly.value && currentUser.value) url += `assignee_id=${currentUser.value.user_id}&`;
 
         const res = await fetch(url);
         issues.value = await res.json();
@@ -1019,14 +757,14 @@ DatabaseConnectionError: Pool exhausted (max 20 reached).`;
 
     return {
       theme, toggleTheme,
-      isLoggedIn, currentUser, demoAccounts, loginEmail, handleLogin, handleLogout, switchRoleQuick,
+      isLoggedIn, currentUser, demoAccounts, loginEmail, handleLogin, handleLogout,
       activeTab, setTab, viewMode, loading, toast, showToast,
       allUsers, handleCreateUser, toggleUserStatus, newUser,
-      dashboardData,
+      dashboardData, loadDashboard, dashboardFilterProject,
       projects, viewProjectDetail, activeProjectDetail, handleCreateProject, newProject,
       toggleArchiveProject, openAddMemberModal, handleAddMember, handleRemoveMember, newMember,
       openAddModuleModal, handleCreateModule, handleDeleteModule, newModule,
-      issues, loadIssues, filterProject, filterStatus, filterSeverity, searchQuery, myIssuesOnly,
+      issues, loadIssues, filterProject, filterStatus, filterSeverity, searchQuery,
       kanbanColumns, getIssuesByStatus,
       createForm, currentProjectModules, currentProjectMembers, triageResult, triggerTriage,
       onProjectChangeInCreate, fillSampleLog, handleCreateIssue,

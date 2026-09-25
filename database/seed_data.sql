@@ -45,7 +45,7 @@ INSERT INTO `issues` (`issue_id`, `issue_key`, `project_id`, `module_id`, `title
 
 (3, 'ECOM-103', 1, 2, 'Token JWT hết hạn không tự động Refresh', 'Người dùng bị logout ngột ngạt khi đang điền thông tin giao hàng.', '1. Đăng nhập hệ thống.\n2. Chờ 15 phút.\n3. Bấm Lưu địa chỉ.', 'jwt.exceptions.ExpiredSignatureError: Signature has expired', 'STAGING', 'BUG', 'MAJOR', 'MEDIUM', 'CLOSED', 90.0, 5, 3, DATE_ADD(NOW(), INTERVAL 12 HOUR)),
 
-(4, 'ECOM-104', 1, 1, 'Tài khoản ngân hàng trùng lặp bị treo giao dịch', 'Giao dịch chuyển khoản trùng mã đơn hàng khiến DB bị deadlock.', 'Tái hiện giao dịch song song 2 tab browser.', 'com.mysql.cj.jdbc.exceptions.MySQLTransactionRollbackException: Deadlock found when trying to get lock; try restarting transaction', 'PRODUCTION', 'INCIDENT', 'CRITICAL', 'HIGH', 'NEW', 98.0, 6, 3, DATE_ADD(NOW(), INTERVAL 2 HOUR));
+(4, 'ECOM-104', 1, 1, 'Tài khoản ngân hàng trùng lặp bị treo giao dịch', 'Giao dịch chuyển khoản trùng mã đơn hàng khiến DB bị deadlock.', 'Tái hiện giao dịch song song 2 tab browser.', 'com.mysql.cj.jdbc.exceptions.MySQLTransactionRollbackException: Deadlock found when trying to get lock, try restarting transaction', 'PRODUCTION', 'INCIDENT', 'CRITICAL', 'HIGH', 'NEW', 98.0, 6, 3, DATE_ADD(NOW(), INTERVAL 2 HOUR));
 
 -- 6. Thêm Comments mẫu
 INSERT INTO `issue_comments` (`issue_id`, `user_id`, `content`) VALUES

@@ -104,21 +104,7 @@
             <i class="bi" :class="theme === 'dark' ? 'bi-sun-fill text-warning' : 'bi-moon-stars-fill text-primary'"></i>
           </button>
 
-          <!-- Quick Role Switch Dropdown -->
-          <div class="dropdown d-none d-sm-block">
-            <button class="btn btn-sm btn-outline-primary dropdown-toggle d-flex align-items-center gap-1" data-bs-toggle="dropdown">
-              <i class="bi bi-shuffle"></i>
-              <span>Đổi Role: <strong>{{ currentUser.role }}</strong></span>
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-              <li v-for="acc in demoAccounts" :key="acc.email">
-                <a class="dropdown-item d-flex align-items-center justify-content-between small py-2" href="#" @click.prevent="switchRoleQuick(acc.email)">
-                  <span><i class="bi me-2" :class="acc.icon"></i>{{ acc.name }}</span>
-                  <span class="badge bg-secondary-subtle text-body ms-2">{{ acc.role }}</span>
-                </a>
-              </li>
-            </ul>
-          </div>
+
 
           <!-- User Info -->
           <div class="d-flex align-items-center gap-2 ps-2 border-start border-secondary-subtle">
@@ -151,7 +137,7 @@
               <span v-if="issues.length" class="badge rounded-pill bg-white text-dark ms-1" style="font-size: 0.65rem;">{{ issues.length }}</span>
             </button>
           </li>
-          <li class="nav-item" v-if="currentUser.role !== 'DEV'">
+          <li class="nav-item" v-if="currentUser.role === 'QA'">
             <button class="nav-link" :class="{ active: activeTab === 'triage' }" @click="setTab('triage')">
               <i class="bi bi-magic"></i> Báo Lỗi & Auto-Triage
             </button>
@@ -185,6 +171,16 @@
       <!-- TAB 1: DASHBOARD ANALYTICS -->
       <!-- ========================================================== -->
       <section v-if="activeTab === 'dashboard'">
+        <!-- Lọc Dự án cho Dashboard -->
+        <div class="row g-2 align-items-center mb-3">
+          <div class="col-12 col-md-3">
+            <select class="form-select form-select-sm" v-model="dashboardFilterProject" @change="loadDashboard">
+              <option value="">-- Tất cả dự án --</option>
+              <option v-for="p in projects" :key="p.project_id" :value="p.project_id">{{ p.project_key }} - {{ p.project_name }}</option>
+            </select>
+          </div>
+        </div>
+        
         <div v-if="dashboardData">
           <!-- Metric Widgets Grid -->
           <div class="row g-3 mb-4">
@@ -355,12 +351,7 @@
                 <option>CRITICAL</option><option>MAJOR</option><option>MINOR</option><option>TRIVIAL</option>
               </select>
             </div>
-            <div class="col-6 col-md-3 d-flex align-items-center justify-content-end">
-              <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" id="myIssuesCheck" v-model="myIssuesOnly" @change="loadIssues">
-                <label class="form-check-label small fw-semibold" for="myIssuesCheck">Chỉ xem ticket của tôi</label>
-              </div>
-            </div>
+
           </div>
 
           <!-- TABLE VIEW -->
@@ -491,7 +482,7 @@
 
                 <div class="mb-3">
                   <label class="form-label small fw-semibold">Tiêu đề lỗi (Bug Title) *</label>
-                  <input type="text" class="form-control" v-model="createForm.title" @input="triggerTriage" required placeholder="Ví dụ: Lỗi HTTP 500 khi xác thực đơn hàng...">
+                  <input type="text" class="form-control" v-model="createForm.title" required placeholder="Ví dụ: Lỗi HTTP 500 khi xác thực đơn hàng...">
                 </div>
 
                 <div class="row g-3 mb-3">
@@ -506,10 +497,18 @@
                 </div>
 
                 <div class="mb-3">
-                  <label class="form-label small fw-semibold d-flex justify-content-between">
-                    <span>Console Log / Stacktrace <span class="text-primary">(Auto-Triage sẽ phân tích tự động tại đây)</span></span>
+                  <label class="form-label small fw-semibold d-flex justify-content-between align-items-center">
+                    <span>Console Log / Stacktrace</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary" @click="triggerTriage">
+                      <i class="bi bi-robot"></i> Phân tích bằng AI
+                    </button>
                   </label>
-                  <textarea class="form-control code-log-box" rows="5" v-model="createForm.raw_logs" @input="triggerTriage" placeholder="Dán đoạn log console hoặc traceback hệ thống vào đây..."></textarea>
+                  <textarea class="form-control code-log-box" rows="5" v-model="createForm.raw_logs" placeholder="Dán đoạn log console hoặc traceback hệ thống vào đây..."></textarea>
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label small fw-semibold">Đính kèm bằng chứng (Ảnh/Video)</label>
+                  <input type="file" class="form-control form-control-sm" multiple accept="image/*,video/*">
                 </div>
 
                 <div class="row g-3 mb-4">
@@ -612,7 +611,7 @@
       <section v-if="activeTab === 'projects'">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h5 class="fw-bold mb-0"><i class="bi bi-folder2-open text-primary me-2"></i>Danh Sách Dự Án Đang Quản Lý</h5>
-          <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createProjectModal">
+          <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createProjectModal" v-if="currentUser.role === 'ADMIN'">
             <i class="bi bi-plus-lg me-1"></i> Tạo Dự Án Mới
           </button>
         </div>
