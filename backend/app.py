@@ -40,6 +40,10 @@ def create_app():
     def serve_frontend():
         return send_from_directory(app.static_folder, 'index.html')
 
+    @app.route('/uploads/<path:filename>')
+    def serve_uploads(filename):
+        return send_from_directory(app.config.get('UPLOAD_FOLDER', '../uploads'), filename)
+
     @app.route('/api/health')
     def health_check():
         return jsonify({

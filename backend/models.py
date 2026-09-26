@@ -129,6 +129,7 @@ class Issue(db.Model):
     assignee = db.relationship('User', foreign_keys=[assignee_id])
     comments = db.relationship('IssueComment', backref='issue', cascade='all, delete-orphan')
     history = db.relationship('IssueHistory', backref='issue', cascade='all, delete-orphan')
+    attachments = db.relationship('Attachment', backref='issue', cascade='all, delete-orphan')
 
     def to_dict(self):
         return {
@@ -155,7 +156,8 @@ class Issue(db.Model):
             'git_commit_ref': self.git_commit_ref,
             'sla_due_date': self.sla_due_date.isoformat() if self.sla_due_date else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'attachments': [a.to_dict() for a in self.attachments]
         }
 
 class IssueComment(db.Model):

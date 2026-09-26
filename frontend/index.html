@@ -109,8 +109,8 @@
           <!-- User Info -->
           <div class="d-flex align-items-center gap-2 ps-2 border-start border-secondary-subtle">
             <div class="text-end d-none d-sm-block">
-              <div class="fw-bold small">{{ currentUser.full_name }}</div>
-              <span class="badge bg-primary-subtle text-primary" style="font-size: 0.68rem;">{{ currentUser.role }}</span>
+              <div class="fw-bold small">{{ currentUser?.full_name }}</div>
+              <span class="badge bg-primary-subtle text-primary" style="font-size: 0.68rem;">{{ currentUser?.role }}</span>
             </div>
             <button class="btn btn-sm btn-outline-danger" @click="handleLogout" title="Đăng xuất">
               <i class="bi bi-box-arrow-right"></i>
@@ -137,17 +137,17 @@
               <span v-if="issues.length" class="badge rounded-pill bg-white text-dark ms-1" style="font-size: 0.65rem;">{{ issues.length }}</span>
             </button>
           </li>
-          <li class="nav-item" v-if="currentUser.role === 'QA'">
+          <li class="nav-item" v-if="currentUser?.role === 'QA'">
             <button class="nav-link" :class="{ active: activeTab === 'triage' }" @click="setTab('triage')">
               <i class="bi bi-magic"></i> Báo Lỗi & Auto-Triage
             </button>
           </li>
-          <li class="nav-item" v-if="currentUser.role === 'PM' || currentUser.role === 'ADMIN'">
+          <li class="nav-item" v-if="currentUser?.role === 'PM' || currentUser?.role === 'ADMIN'">
             <button class="nav-link" :class="{ active: activeTab === 'projects' }" @click="setTab('projects')">
               <i class="bi bi-folder-fill"></i> Quản Lý Dự Án
             </button>
           </li>
-          <li class="nav-item" v-if="currentUser.role === 'ADMIN'">
+          <li class="nav-item" v-if="currentUser?.role === 'ADMIN'">
             <button class="nav-link" :class="{ active: activeTab === 'admin' }" @click="setTab('admin')">
               <i class="bi bi-shield-lock-fill"></i> Quản Trị Hệ Thống
             </button>
@@ -464,8 +464,8 @@
                     <label class="form-label small fw-semibold">Dự án áp dụng *</label>
                     <select class="form-select" v-model="createForm.project_id" @change="onProjectChangeInCreate" required>
                       <option value="" disabled>-- Chọn dự án --</option>
-                      <option v-for="p in projects" :key="p.project_id" :value="p.project_id" :disabled="p.status === 'ARCHIVED'">
-                        {{ p.project_key }} - {{ p.project_name }} {{ p.status === 'ARCHIVED' ? '[Đã đóng]' : '' }}
+                      <option v-for="p in allowedProjectsForCreate" :key="p.project_id" :value="p.project_id">
+                        {{ p.project_key }} - {{ p.project_name }}
                       </option>
                     </select>
                   </div>
@@ -508,7 +508,7 @@
 
                 <div class="mb-3">
                   <label class="form-label small fw-semibold">Đính kèm bằng chứng (Ảnh/Video)</label>
-                  <input type="file" class="form-control form-control-sm" multiple accept="image/*,video/*">
+                  <input type="file" class="form-control form-control-sm" accept="image/*,video/*" @change="handleFileUpload" ref="fileInput">
                 </div>
 
                 <div class="row g-3 mb-4">
@@ -611,7 +611,7 @@
       <section v-if="activeTab === 'projects'">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h5 class="fw-bold mb-0"><i class="bi bi-folder2-open text-primary me-2"></i>Danh Sách Dự Án Đang Quản Lý</h5>
-          <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createProjectModal" v-if="currentUser.role === 'ADMIN'">
+          <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createProjectModal" v-if="currentUser?.role === 'ADMIN'">
             <i class="bi bi-plus-lg me-1"></i> Tạo Dự Án Mới
           </button>
         </div>
@@ -737,6 +737,18 @@
                 <pre class="code-log-box mb-0">{{ activeIssue.raw_logs }}</pre>
               </div>
 
+              <!-- Đính kèm -->
+              <div class="mb-3" v-if="activeIssue.attachments && activeIssue.attachments.length">
+                <h6 class="fw-semibold small text-secondary">Tệp đính kèm:</h6>
+                <div class="d-flex flex-wrap gap-2">
+                  <a v-for="att in activeIssue.attachments" :key="att.attachment_id" :href="att.file_url" target="_blank" class="border rounded p-1 text-center bg-body">
+                    <img v-if="att.file_type && att.file_type.includes('image')" :src="att.file_url" style="max-height: 150px; max-width: 100%; object-fit: contain;">
+                    <video v-else-if="att.file_type && att.file_type.includes('video')" :src="att.file_url" controls style="max-height: 150px; max-width: 100%; object-fit: contain;"></video>
+                    <div v-else class="text-primary small p-2"><i class="bi bi-file-earmark-play"></i> {{ att.file_name }}</div>
+                  </a>
+                </div>
+              </div>
+
               <!-- Triage & Reassign Controls (For PM / Dev / Admin) -->
               <div class="p-3 mb-4 rounded border bg-primary-subtle" v-if="activeIssue.project_status !== 'ARCHIVED'">
                 <h6 class="fw-bold small text-primary mb-2"><i class="bi bi-sliders me-1"></i>Điều phối & Tái phân loại (Triage):</h6>
@@ -745,7 +757,7 @@
                     <label class="small text-secondary">Gán Dev xử lý:</label>
                     <select class="form-select form-select-sm" v-model="triageEdit.assignee_id">
                       <option value="">-- Chưa gán --</option>
-                      <option v-for="u in allUsers" :key="u.user_id" :value="u.user_id">{{ u.full_name }}</option>
+                      <option v-for="m in triageProjectMembers.filter(m => m.project_role === 'DEV')" :key="m.user_id" :value="m.user_id">{{ m.user ? m.user.full_name : 'N/A' }}</option>
                     </select>
                   </div>
                   <div class="col-6 col-md-4">
@@ -850,35 +862,39 @@
                 <div v-else class="d-grid gap-2">
                   <!-- NEW / REOPENED -->
                   <template v-if="activeIssue.status === 'NEW' || activeIssue.status === 'REOPENED'">
-                    <button class="btn btn-warning btn-sm fw-semibold" v-if="currentUser.role === 'DEV'" @click="handleChangeStatus('IN_PROGRESS')">
+                    <button class="btn btn-warning btn-sm fw-semibold" v-if="currentUser?.role === 'DEV'" @click="handleChangeStatus('IN_PROGRESS')">
                       <i class="bi bi-play-circle me-1"></i> Bắt đầu sửa (IN_PROGRESS)
                     </button>
-                    <button class="btn btn-outline-danger btn-sm" v-if="currentUser.role === 'PM' || currentUser.role === 'ADMIN'" @click="handleChangeStatus('REJECTED')">
+                    <button class="btn btn-outline-danger btn-sm" v-if="currentUser?.role === 'PM' || currentUser?.role === 'ADMIN'" @click="handleChangeStatus('REJECTED')">
                       <i class="bi bi-x-circle me-1"></i> Từ chối (REJECTED)
                     </button>
-                    <button class="btn btn-outline-secondary btn-sm" v-if="currentUser.role === 'PM' || currentUser.role === 'ADMIN'" @click="handleChangeStatus('DUPLICATE')">
+                    <button class="btn btn-outline-secondary btn-sm" v-if="currentUser?.role === 'PM' || currentUser?.role === 'ADMIN'" @click="handleChangeStatus('DUPLICATE')">
                       <i class="bi bi-files me-1"></i> Trùng lặp (DUPLICATE)
                     </button>
-                    <button class="btn btn-outline-warning btn-sm" v-if="currentUser.role === 'PM' || currentUser.role === 'ADMIN'" @click="handleChangeStatus('DEFERRED')">
+                    <button class="btn btn-outline-warning btn-sm" v-if="currentUser?.role === 'PM' || currentUser?.role === 'ADMIN'" @click="handleChangeStatus('DEFERRED')">
                       <i class="bi bi-pause-circle me-1"></i> Hoãn lại (DEFERRED)
                     </button>
                   </template>
 
                   <!-- IN_PROGRESS -->
                   <template v-else-if="activeIssue.status === 'IN_PROGRESS'">
-                    <button class="btn btn-success btn-sm fw-semibold" v-if="currentUser.role === 'DEV'" @click="handleChangeStatus('RESOLVED')">
+                    <button class="btn btn-success btn-sm fw-semibold" v-if="currentUser?.role === 'DEV'" @click="handleChangeStatus('RESOLVED')">
                       <i class="bi bi-check2-circle me-1"></i> Đã fix code (RESOLVED)
                     </button>
                   </template>
 
-                  <!-- RESOLVED -->
                   <template v-else-if="activeIssue.status === 'RESOLVED'">
-                    <button class="btn btn-success btn-sm fw-semibold" @click="handleChangeStatus('CLOSED')">
-                      <i class="bi bi-shield-check me-1"></i> Re-test Đạt & Đóng (CLOSED)
-                    </button>
-                    <button class="btn btn-danger btn-sm fw-semibold" @click="handleChangeStatus('REOPENED')">
-                      <i class="bi bi-arrow-counterclockwise me-1"></i> Re-test Fail & Mở lại (REOPENED)
-                    </button>
+                    <template v-if="currentUser?.role === 'QA'">
+                      <button class="btn btn-success btn-sm fw-semibold" @click="handleChangeStatus('CLOSED')">
+                        <i class="bi bi-shield-check me-1"></i> Re-test Đạt & Đóng (CLOSED)
+                      </button>
+                      <button class="btn btn-danger btn-sm fw-semibold" @click="handleChangeStatus('REOPENED')">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Re-test Fail & Mở lại (REOPENED)
+                      </button>
+                    </template>
+                    <div v-else class="alert alert-info py-2 px-3 small mb-0 text-center">
+                      <i class="bi bi-hourglass-split me-1"></i> Đang chờ QA kiểm tra
+                    </div>
                   </template>
 
                   <!-- CLOSED -->
@@ -936,11 +952,27 @@
               <textarea class="form-control" rows="3" v-model="newProject.description"></textarea>
             </div>
             <div class="mb-3">
-              <label class="form-label small fw-semibold">Gán PM Phụ Trách</label>
-              <select class="form-select" v-model="newProject.pm_id">
+              <label class="form-label small fw-semibold">Gán PM Phụ Trách *</label>
+              <select class="form-select" v-model="newProject.pm_id" required>
                 <option value="">-- Chưa gán --</option>
-                <option v-for="u in allUsers" :key="u.user_id" :value="u.user_id">{{ u.full_name }} ({{ u.email }})</option>
+                <option v-for="u in allUsers" :key="u.user_id" :value="u.user_id">{{ u?.full_name }} ({{ u?.email }})</option>
               </select>
+            </div>
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="form-label small fw-semibold">Gán Dev Phụ Trách *</label>
+                <select class="form-select" v-model="newProject.dev_id" required>
+                  <option value="">-- Chưa gán --</option>
+                  <option v-for="u in allUsers" :key="u.user_id" :value="u.user_id">{{ u?.full_name }} ({{ u?.email }})</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label small fw-semibold">Gán QA Phụ Trách *</label>
+                <select class="form-select" v-model="newProject.qa_id" required>
+                  <option value="">-- Chưa gán --</option>
+                  <option v-for="u in allUsers" :key="u.user_id" :value="u.user_id">{{ u?.full_name }} ({{ u?.email }})</option>
+                </select>
+              </div>
             </div>
           </div>
           <div class="modal-footer border-0">

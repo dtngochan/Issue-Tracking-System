@@ -86,7 +86,16 @@ def get_issue_detail(issue_id):
 
 @issue_bp.route('', methods=['POST'])
 def create_issue():
-    data = request.get_json() or {}
+    import os
+    from werkzeug.utils import secure_filename
+    from flask import current_app
+    from models import Attachment
+
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
+
     project_id = data.get('project_id')
     module_id = data.get('module_id')
     title = data.get('title', '').strip()
@@ -163,8 +172,30 @@ def create_issue():
         new_value=f'Tạo mới ticket {issue_key} (Auto-Triage Confidence: {confidence}%)'
     )
     db.session.add(history)
-    db.session.commit()
 
+    # -------------------------------------
+    # XỬ LÝ LƯU FILE ẢNH/VIDEO ĐÍNH KÈM
+    # -------------------------------------
+    uploaded_file = request.files.get('file')
+    if uploaded_file and uploaded_file.filename != '':
+        filename = secure_filename(uploaded_file.filename)
+        # Thêm timestamp để tránh trùng tên file
+        unique_filename = f"{new_issue.issue_id}_{filename}"
+        upload_path = os.path.join(current_app.config.get('UPLOAD_FOLDER', '../uploads'), unique_filename)
+        
+        uploaded_file.save(upload_path)
+        
+        # Lưu vào DB
+        attachment = Attachment(
+            issue_id=new_issue.issue_id,
+            file_name=filename,
+            file_url=f"/uploads/{unique_filename}",
+            file_type=uploaded_file.content_type,
+            uploaded_by=reporter_id
+        )
+        db.session.add(attachment)
+
+    db.session.commit()
     return jsonify(new_issue.to_dict()), 201
 
 @issue_bp.route('/<int:issue_id>/status', methods=['PUT'])
@@ -219,9 +250,6 @@ def update_status(issue_id):
         # Dev chỉ được phép làm việc trên ticket của mình
         if issue.assignee_id != user_id:
             return jsonify({'error': 'Từ chối: Ticket này không được giao cho bạn!'}), 403
-        # Dev chỉ được chuyển trạng thái sang Đang xử lý hoặc Đã sửa xong
-        if new_status not in ['IN_PROGRESS', 'RESOLVED']:
-            return jsonify({'error': 'Từ chối: DEV chỉ được chuyển sang IN_PROGRESS hoặc RESOLVED. Chỉ QA/PM mới được CLOSED.'}), 403
 
     issue.status = new_status
     if git_ref:
